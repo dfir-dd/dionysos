@@ -8,12 +8,10 @@ dionysos 0.1.0
 Scanner for certain IoCs
 
 USAGE:
-    dionysos [PATH]
-
-ARGS:
-    <PATH>    path to registry hive file
+    dionysos [OPTIONS]
 
 OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+    -h, --help           Print help information
+    -P, --path <PATH>    path to registry hive file
+    -V, --version        Print version information
 ```
