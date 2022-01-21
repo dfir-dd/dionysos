@@ -33,6 +33,7 @@ pub trait HasWorker: FileHandler {
                 Ok(filename) => filename,
             };
 
+            //FIXME: this could be spread over multiple threads
             Self::handle_file(&result);
 
             for sender in senders.iter() {
