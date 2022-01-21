@@ -5,13 +5,13 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::sync::Arc;
 use provider_derive::*;
+use consumer_derive::*;
 use log;
 
 #[has_consumers_list]
+#[has_thread_handle]
 #[derive(FileProvider)]
 pub struct YaraScanner {
-    // needed for Consumers
-    thread_handle: Option<thread::JoinHandle<()>>
 }
 
 //implement_provider_for!(YaraScanner, consumers);

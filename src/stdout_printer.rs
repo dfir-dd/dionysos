@@ -3,9 +3,10 @@ use std::sync::Arc;
 use std::thread;
 use crate::consumer::*;
 use crate::scanner_result::ScannerResult;
+use consumer_derive::*;
 
+#[has_thread_handle]
 pub struct StdoutPrinter {
-    thread_handle: Option<thread::JoinHandle<()>>,
 }
 
 implement_consumer_for!(StdoutPrinter, thread_handle);
