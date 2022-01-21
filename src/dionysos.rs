@@ -20,9 +20,9 @@ impl Dionysos {
     pub fn run(&self) -> Result<()> {
         let mut enumerator = FileEnumerator::new(self.path.clone());
 
-        let mut yara_scanner = YaraScanner::new();
-        let mut filename_scanner = FilenameScanner::new();
-        yara_scanner.register_consumer(StdoutPrinter::new());
+        let mut yara_scanner = YaraScanner::default();
+        let mut filename_scanner = FilenameScanner::default();
+        yara_scanner.register_consumer(StdoutPrinter::default());
         filename_scanner.register_consumer(yara_scanner);
         enumerator.register_consumer(filename_scanner);
         enumerator.run()?;

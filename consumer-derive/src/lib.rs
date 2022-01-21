@@ -6,6 +6,28 @@ use syn::{parse_macro_input, DeriveInput, parse::Parser};
 pub fn derive(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, .. } = parse_macro_input!(input);
     let output = quote! {
+        impl HasWorker for #ident {}
+
+        impl FileConsumer for #ident {
+            fn join(&mut self) {
+                if let Some(th) = self.thread_handle.take() {
+                    match th.join() {
+                        Err(why) => {
+                            log::error!("join: {:?}", why);
+                            // do not abort, instead also join() the remaining threads
+                            // return Err(Box::new(why));
+                        }
+                        Ok(_) => ()
+                    }
+                }
+            }
+
+            fn start_with(&mut self, receiver: Receiver<Arc<ScannerResult>>) {
+                let consumers = std::mem::take(&mut self.consumers);
+                let handle = thread::spawn(|| Self::worker(receiver, consumers));
+                self.thread_handle = Some(handle);
+            }
+        }
     };
     output.into()
 }

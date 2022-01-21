@@ -5,29 +5,18 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::sync::Arc;
 use provider_derive::*;
+use consumer_derive::*;
 use log;
 
 #[has_consumers_list]
+#[has_thread_handle]
 #[derive(FileProvider)]
-pub struct FilenameScanner {
-    // needed for Consumers
-    thread_handle: Option<thread::JoinHandle<()>>
-}
+#[derive(FileConsumer)]
+#[derive(Default)]
+pub struct FilenameScanner {}
 
-//implement_provider_for!(FilenameScanner, consumers);
-implement_consumer_for!(FilenameScanner, thread_handle, consumers);
-
-impl FilenameScanner {
-    pub fn new() -> Self {
-        Self {
-            consumers: Vec::new(),
-            thread_handle: None
-        }
-    }
-
-    implement_worker!(FilenameScanner, scan_filename);
-
-    fn scan_filename(result: &ScannerResult) {
+impl FileHandler for FilenameScanner {
+    fn handle_file(result: &ScannerResult) {
         if result.filename().ends_with(".rs") {
             result.add_finding(ScannerFinding::Filename("*.rs".to_owned()));
         }        

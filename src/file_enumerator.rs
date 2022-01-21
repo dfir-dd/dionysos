@@ -4,10 +4,13 @@ use crate::scanner_result::ScannerResult;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 use std::sync::Arc;
+use provider_derive::*;
+use consumer_derive::*;
 
+#[has_consumers_list]
+#[derive(FileProvider)]
 pub struct FileEnumerator {
     path: PathBuf,
-    consumers: Vec<Box<dyn FileConsumer>>
 }
 
 impl FileEnumerator {
@@ -17,7 +20,7 @@ impl FileEnumerator {
             consumers: Vec::new()
         }
     }
-
+    
     pub fn run(&mut self) -> Result<()> {
         let mut senders = generate_senders(self.consumers.iter_mut());
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
@@ -35,14 +38,5 @@ impl FileEnumerator {
 
         self.consumers.clear();
         Ok(())
-    }
-}
-
-impl FileProvider for FileEnumerator {
-    fn register_consumer<T>(&mut self, consumer: T)
-    where
-        T: FileConsumer + 'static,
-    {
-        self.consumers.push(Box::new(consumer));
     }
 }
