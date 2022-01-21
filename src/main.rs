@@ -1,5 +1,7 @@
 use anyhow::Result;
 
+mod file_enumerator;
+mod consumer;
 mod dionysos;
 use dionysos::*;
 
