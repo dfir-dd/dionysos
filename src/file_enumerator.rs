@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crate::consumer::*;
+use crate::scanner_result::ScannerResult;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 use std::sync::Arc;
@@ -20,7 +21,7 @@ impl FileEnumerator {
     pub fn run(&mut self) -> Result<()> {
         let mut senders = generate_senders(self.consumers.iter_mut());
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
-            let path = Arc::new(entry.path().to_owned());
+            let path: Arc<ScannerResult> = Arc::new(ScannerResult::from(entry.path()));
             for sender in senders.iter() {
                 sender.send(Arc::clone(&path))?;
             }

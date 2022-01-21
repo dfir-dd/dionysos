@@ -1,18 +1,17 @@
 use yara;
 use crate::consumer::*;
+use crate::scanner_result::ScannerResult;
 use std::sync::mpsc::Receiver;
-use std::path::PathBuf;
 use std::thread;
 use std::sync::Arc;
 use log;
-use crate::macros::*;
 
 pub struct YaraScanner {
     // needed for providers
     consumers: Vec<Box<dyn FileConsumer>>,
 
     // needed for Consumers
-    thread_handle: Option<thread::JoinHandle<thread::Result<ConsumerResult>>>
+    thread_handle: Option<thread::JoinHandle<()>>
 }
 
 implement_provider_for!(YaraScanner, consumers);
@@ -26,42 +25,10 @@ impl YaraScanner {
         }
     }
 
-    fn scan_yara(rx: Receiver<Arc<PathBuf>>,
-        mut consumers: Vec<Box<dyn FileConsumer>>) -> thread::Result<ConsumerResult> {
-        let mut senders = generate_senders(consumers.iter_mut());
-        loop {
-            let filename = match rx.recv() {
-                Err(_) => break,
-                Ok(filename) => filename,
-            };
+    implement_worker!(YaraScanner, scan_yara);
 
-            for sender in senders.iter() {
-                match sender.send(Arc::clone(&filename)) {
-                    Err(why) => {
-                        log::error!("send: {}", why);
-                        return Err(Box::new(why));
-                    }
-                    Ok(_) => ()
-                }
-            }
-        }
-
-        senders.clear();
-
-        for consumer in consumers.iter_mut() {
-            match consumer.join() {
-                Err(why) => {
-                    // the consumer should have already handled this,
-                    // so we simply forward the error
-                    //log::error!("join: {:?}", why);
-                    return Err(Box::new(why));
-                }
-                Ok(_) => ()
-            }
-        }
-
-        consumers.clear();
-        Ok(ConsumerResult::NoInfo)
+    fn scan_yara(result: &ScannerResult) {
+        
     }
 }
 

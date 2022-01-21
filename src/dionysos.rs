@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use crate::file_enumerator::*;
 use crate::consumer::*;
 use crate::yara_scanner::YaraScanner;
+use crate::filename_scanner::FilenameScanner;
+use crate::stdout_printer::StdoutPrinter;
 
 pub struct Dionysos {
     path: PathBuf
@@ -19,8 +21,10 @@ impl Dionysos {
         let mut enumerator = FileEnumerator::new(self.path.clone());
 
         let mut yara_scanner = YaraScanner::new();
+        let mut filename_scanner = FilenameScanner::new();
         yara_scanner.register_consumer(StdoutPrinter::new());
-        enumerator.register_consumer(yara_scanner);
+        filename_scanner.register_consumer(yara_scanner);
+        enumerator.register_consumer(filename_scanner);
         enumerator.run()?;
 
         Ok(())
