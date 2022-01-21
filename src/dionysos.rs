@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::{App, Arg};
-use std::path::{PathBuf};
+use std::path::PathBuf;
+
+use crate::file_enumerator::*;
+use crate::consumer::*;
 
 pub struct Dionysos {
     path: PathBuf
@@ -12,6 +15,11 @@ impl Dionysos {
     }
 
     pub fn run(&self) -> Result<()> {
+        let mut enumerator = FileEnumerator::new(self.path.clone());
+
+        enumerator.register_consumer(StdoutPrinter::default());
+        enumerator.run();
+
         Ok(())
     }
 
@@ -23,6 +31,8 @@ impl Dionysos {
             .arg(
                 Arg::new("PATH")
                     .help("path to registry hive file")
+                    .long("path")
+                    .short('P')
                     .required(false)
                     .multiple_occurrences(false)
                     .multiple_values(false)
