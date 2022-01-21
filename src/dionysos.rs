@@ -33,6 +33,11 @@ impl Dionysos {
         let matches = app.get_matches();
         let path = match matches.value_of("PATH") {
             Some(path) => PathBuf::from(&path),
+
+            #[cfg(target_os = "windows")]
+            None => PathBuf::from("\\"),
+
+            #[cfg(not(target_os = "windows"))]
             None => PathBuf::from("/"),
         };
 
