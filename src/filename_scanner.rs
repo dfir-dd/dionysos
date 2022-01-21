@@ -4,8 +4,10 @@ use crate::scanner_result::{ScannerResult, ScannerFinding};
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::sync::Arc;
+use provider_derive::*;
 use log;
 
+#[derive(FileProvider)]
 pub struct FilenameScanner {
     // needed for providers
     consumers: Vec<Box<dyn FileConsumer>>,
@@ -14,7 +16,7 @@ pub struct FilenameScanner {
     thread_handle: Option<thread::JoinHandle<()>>
 }
 
-implement_provider_for!(FilenameScanner, consumers);
+//implement_provider_for!(FilenameScanner, consumers);
 implement_consumer_for!(FilenameScanner, thread_handle, consumers);
 
 impl FilenameScanner {

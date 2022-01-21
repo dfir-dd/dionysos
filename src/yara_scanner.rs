@@ -4,8 +4,10 @@ use crate::scanner_result::ScannerResult;
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::sync::Arc;
+use provider_derive::*;
 use log;
 
+#[derive(FileProvider)]
 pub struct YaraScanner {
     // needed for providers
     consumers: Vec<Box<dyn FileConsumer>>,
@@ -14,7 +16,7 @@ pub struct YaraScanner {
     thread_handle: Option<thread::JoinHandle<()>>
 }
 
-implement_provider_for!(YaraScanner, consumers);
+//implement_provider_for!(YaraScanner, consumers);
 implement_consumer_for!(YaraScanner, thread_handle, consumers);
 
 impl YaraScanner {
