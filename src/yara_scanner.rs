@@ -7,11 +7,9 @@ use std::sync::Arc;
 use provider_derive::*;
 use log;
 
+#[has_consumers_list]
 #[derive(FileProvider)]
 pub struct YaraScanner {
-    // needed for providers
-    consumers: Vec<Box<dyn FileConsumer>>,
-
     // needed for Consumers
     thread_handle: Option<thread::JoinHandle<()>>
 }
