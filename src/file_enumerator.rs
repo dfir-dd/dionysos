@@ -37,8 +37,10 @@ impl FileEnumerator {
         self.consumers.clear();
         Ok(())
     }
+}
 
-    pub fn register_consumer<T>(&mut self, mut consumer: T)
+impl FileProvider for FileEnumerator {
+    fn register_consumer<T>(&mut self, mut consumer: T)
     where
         T: FileConsumer + 'static,
     {

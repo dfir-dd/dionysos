@@ -8,6 +8,12 @@ pub trait FileConsumer {
     fn join(&mut self);
 }
 
+pub trait FileProvider {
+    fn register_consumer<T>(&mut self, consumer: T)
+    where
+        T: FileConsumer + 'static;
+}
+
 pub struct StdoutPrinter {
     thread_handle: Option<thread::JoinHandle<()>>
 }
