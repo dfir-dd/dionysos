@@ -1,11 +1,7 @@
 use crate::consumer::*;
 use crate::scanner_result::{ScannerResult, ScannerFinding};
-use std::sync::mpsc::Receiver;
-use std::thread;
-use std::sync::Arc;
 use provider_derive::*;
 use consumer_derive::*;
-use log;
 
 #[has_consumers_list]
 #[has_thread_handle]

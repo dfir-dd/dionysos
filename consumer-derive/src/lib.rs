@@ -22,9 +22,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn start_with(&mut self, receiver: Receiver<Arc<ScannerResult>>) {
+            fn start_with(&mut self, receiver: std::sync::mpsc::Receiver<std::sync::Arc<ScannerResult>>) {
                 let consumers = std::mem::take(&mut self.consumers);
-                let handle = thread::spawn(|| Self::worker(receiver, consumers));
+                let handle = std::thread::spawn(|| Self::worker(receiver, consumers));
                 self.thread_handle = Some(handle);
             }
         }
@@ -41,7 +41,7 @@ pub fn has_thread_handle(_args: TokenStream, input: TokenStream) -> TokenStream 
                 syn::Fields::Named(fields) => {
                     fields
                         .named
-                        .push(syn::Field::parse_named.parse2(quote! { thread_handle: Option<thread::JoinHandle<()>> }).unwrap());
+                        .push(syn::Field::parse_named.parse2(quote! { thread_handle: Option<std::thread::JoinHandle<()>> }).unwrap());
                 }   
                 _ => {
                     ()
