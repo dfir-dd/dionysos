@@ -20,6 +20,12 @@ OPTIONS:
 
 ## How to add scanners
 
+### 1. Declare scanner result type
+
+You should enhance the class `ScannerFinding` in [src/scanner_result.rs](src/scanner_result.rs).
+
+### 2. Implementation of the scanner
+
 Take, for example, the `FilenameScanner`, which tries to do a simple filename match:
 
 ```rust
@@ -42,5 +48,8 @@ impl FileHandler for FilenameScanner {
         }        
     }
 }
-
 ```
+
+### 3. Add your scanner to the scanner chain
+
+Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dionysis.rs))
