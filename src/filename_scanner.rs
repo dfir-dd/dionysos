@@ -1,4 +1,3 @@
-use yara;
 use crate::consumer::*;
 use crate::scanner_result::{ScannerResult, ScannerFinding};
 use std::sync::mpsc::Receiver;

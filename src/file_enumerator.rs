@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 use std::sync::Arc;
 use provider_derive::*;
-use consumer_derive::*;
 
 #[has_consumers_list]
 #[derive(FileProvider)]
@@ -20,7 +19,7 @@ impl FileEnumerator {
             consumers: Vec::new()
         }
     }
-    
+
     pub fn run(&mut self) -> Result<()> {
         let mut senders = generate_senders(self.consumers.iter_mut());
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
