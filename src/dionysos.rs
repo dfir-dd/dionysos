@@ -35,11 +35,14 @@ impl Dionysos {
     }
 
     fn init_logging(&self) -> Result<()> {
-        anyhow!(TermLogger::init(
+        match TermLogger::init(
             self.loglevel,
             Config::default(),
             TerminalMode::Stderr,
-            ColorChoice::Auto))
+            ColorChoice::Auto) {
+                Err(why) => Err(anyhow!(why)),
+                _ => Ok(()),
+            }
     }
 
     fn parse_options() -> Result<Self> {
@@ -64,6 +67,16 @@ impl Dionysos {
                     .required(false)
                     .takes_value(false)
                     .multiple_occurrences(true)
+            )
+            .arg(
+                Arg::new("YARA_RULES")
+                    .help("use yara scanner with the specified ruleset. This can be a single file, a zip file or a directory containing lots of yara files. Yara files must end with 'yar' or 'yara', and zip files must end with 'zip'")
+                    .short('Y')
+                    .long("yara")
+                    .required(false)
+                    .multiple_occurrences(false)
+                    .multiple_values(false)
+                    .takes_value(true)
             )
             ;
         
