@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/regview"
-license-file = "LICENSE"
+license = "GPL-3.0"
 authors = ["Jan Starke <Jan.Starke@t-systems.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
