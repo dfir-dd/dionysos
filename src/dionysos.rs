@@ -2,17 +2,19 @@ use anyhow::{Result, anyhow};
 use clap::{App, Arg};
 use std::path::PathBuf;
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
+use regex;
 
 use crate::file_enumerator::*;
 use crate::consumer::*;
 use crate::yara_scanner::YaraScanner;
-//use crate::filename_scanner::FilenameScanner;
+use crate::filename_scanner::FilenameScanner;
 use crate::stdout_printer::StdoutPrinter;
 
 pub struct Dionysos {
     path: PathBuf,
     loglevel: LevelFilter,
     yara_rules: Option<PathBuf>,
+    filenames: Vec<regex::Regex>,
 }
 
 impl Dionysos {
@@ -33,6 +35,14 @@ impl Dionysos {
             yara_scanner.register_consumer(scanner_chain);
             scanner_chain = Box::new(yara_scanner);
         };
+
+        if !self.filenames.is_empty() {
+            let mut filename_scanner = FilenameScanner::default();
+            filename_scanner.add_patterns(self.filenames.clone());
+            filename_scanner.seal();
+            filename_scanner.register_consumer(scanner_chain);
+            scanner_chain = Box::new(filename_scanner);
+        }
 
         let mut enumerator = FileEnumerator::new(self.path.clone());
         enumerator.register_consumer(scanner_chain);
@@ -85,6 +95,16 @@ impl Dionysos {
                     .multiple_values(false)
                     .takes_value(true)
             )
+            .arg(
+                Arg::new("FILENAME_REGEX")
+                    .help("regular expression to match against the basename of files. This parameter can be specified multiple times")
+                    .short('F')
+                    .long("filename")
+                    .required(false)
+                    .multiple_values(false)
+                    .multiple_occurrences(true)
+                    .takes_value(true)
+            )
             ;
         
         let matches = app.get_matches();
@@ -118,10 +138,23 @@ impl Dionysos {
             }
         };
 
+        let filenames: Vec<regex::Regex> = match matches.values_of("FILENAME_REGEX") {
+            Some(f) => {
+                let mut filenames = Vec::new();
+                for s in f {
+                    let re = regex::Regex::new(s)?;
+                    filenames.push(re);
+                }
+                filenames
+            }
+            None => Vec::new(),
+        };
+
         Ok(Self {
             path,
             loglevel,
-            yara_rules
+            yara_rules,
+            filenames
         })
     }
 }

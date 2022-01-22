@@ -41,7 +41,7 @@ pub struct YaraScanner {
 
 impl YaraScanner {
     pub fn seal(&mut self) {
-        //self.data = Arc::new(std::mem::take(&mut self.unsealed_data));
+        self.data = Arc::new(std::mem::take(&mut self.unsealed_data));
     }
 }
 

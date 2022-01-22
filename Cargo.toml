@@ -16,5 +16,6 @@ log = "0.4"
 walkdir = "2"
 yara = "0.12"
 zip = "0.5"
+regex = "1.5"
 provider-derive = { path = "provider-derive" }
 consumer-derive = { path = "consumer-derive" }
