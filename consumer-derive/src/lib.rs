@@ -2,11 +2,104 @@ use proc_macro::{self, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, parse::Parser};
 
-#[proc_macro_derive(FileConsumer)]
+#[proc_macro_derive(FileConsumer, attributes(consumer_data))]
 pub fn derive(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, .. } = parse_macro_input!(input);
+    let ast: syn::DeriveInput = syn::parse(input).unwrap();
+    let ident = &ast.ident;
+
+    let mut consumer_data: Option<(proc_macro2::Ident, syn::Type)> = None;
+    match ast.data {
+        syn::Data::Struct(ref data_struct) => match data_struct.fields {
+            syn::Fields::Named(ref fields_named) => {
+                for field in fields_named.named.iter() {
+                    for attr in field.attrs.iter() {
+                        match attr.parse_meta().unwrap() {
+                            syn::Meta::Path(ref path)
+                                    if path
+                                        .get_ident()
+                                        .unwrap()
+                                        .to_string()
+                                        == "consumer_data" => {
+                                    let item = field.clone();
+                                    consumer_data = Some((item.ident.unwrap(), item.ty));
+                                    break;
+                                }
+                            _ => ()
+                        }
+                    }
+                    if consumer_data.is_some() { break; }
+                }
+            }
+            _ => ()
+        }
+        _ => ()
+    }
+
+    if let Some(cd) = consumer_data.take() {
+        let outer_type = cd.1.clone();
+        match outer_type {
+            syn::Type::Path(path) => {
+                'outer: for segment in path.path.segments.iter() {
+                    match &segment.arguments {
+                        syn::PathArguments::AngleBracketed(args) => {
+                            for arg in args.args.iter() {
+                                match arg {
+                                    syn::GenericArgument::Type(t) => {
+                                        consumer_data = Some((cd.0, t.clone()));
+                                        break 'outer;
+                                    }
+                                    _ => ()
+                                }
+                            }
+                        }
+                        _ => ()
+                    }
+                }
+            }
+            _ => ()
+        }
+    }
+
+    let has_worker = match consumer_data {
+        None => {
+            quote!{
+                impl HasWorker<()> for #ident {}
+            }
+        }
+        Some(ref cd) => {
+            let consumerdata_type = &cd.1;
+            quote! {
+                impl HasWorker<#consumerdata_type> for #ident {}
+            }
+        }
+    };
+
+    let start_with = match consumer_data {
+        None => {
+            quote!{
+                fn start_with(&mut self, receiver: std::sync::mpsc::Receiver<std::sync::Arc<ScannerResult>>) {
+                    let dummy = Arc::new(());
+                    let consumers = std::mem::take(&mut self.consumers);
+                    let handle = std::thread::spawn(|| Self::worker(receiver, consumers, dummy));
+                    self.thread_handle = Some(handle);
+                }
+            }
+        }
+        Some(ref cd) => {
+            let consumerdata_name = &cd.0;
+            quote! {
+                fn start_with(&mut self, receiver: std::sync::mpsc::Receiver<std::sync::Arc<ScannerResult>>) {
+                    let data = Arc::clone(&self.#consumerdata_name);
+                    let consumers = std::mem::take(&mut self.consumers);
+                    let handle = std::thread::spawn(|| Self::worker(receiver, consumers, data));
+                    self.thread_handle = Some(handle);
+                }
+            }
+        }
+    };
+
     let output = quote! {
-        impl HasWorker for #ident {}
+        #has_worker
 
         impl FileConsumer for #ident {
             fn join(&mut self) {
@@ -21,12 +114,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     }
                 }
             }
-
-            fn start_with(&mut self, receiver: std::sync::mpsc::Receiver<std::sync::Arc<ScannerResult>>) {
-                let consumers = std::mem::take(&mut self.consumers);
-                let handle = std::thread::spawn(|| Self::worker(receiver, consumers));
-                self.thread_handle = Some(handle);
-            }
+            #start_with
         }
     };
     output.into()

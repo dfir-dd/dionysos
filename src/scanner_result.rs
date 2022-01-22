@@ -1,8 +1,9 @@
 use std::path::{PathBuf, Path};
 use std::sync::Mutex;
+use crate::yara_scanner::YaraFinding;
 
 pub enum ScannerFinding {
-    Yara(String),
+    Yara(YaraFinding),
     Filename(String)
 }
 

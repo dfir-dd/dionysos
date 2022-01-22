@@ -1,6 +1,4 @@
-use std::sync::mpsc::Receiver;
 use std::sync::Arc;
-use std::thread;
 use crate::consumer::*;
 use crate::scanner_result::ScannerResult;
 use provider_derive::*;
@@ -13,8 +11,8 @@ use consumer_derive::*;
 pub struct StdoutPrinter {}
 
 
-impl FileHandler for StdoutPrinter {
-    fn handle_file(result: &ScannerResult) {
+impl FileHandler<()> for StdoutPrinter {
+    fn handle_file(result: &ScannerResult, _: Arc<()>) {
         if result.has_findings() {
             println!("{}", result.filename());
         }

@@ -7,11 +7,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, .. } = parse_macro_input!(input);
     let output = quote! {
         impl FileProvider for #ident {
-            fn register_consumer<T>(&mut self, consumer: T)
-            where
-                T: FileConsumer + 'static,
-            {
-                self.consumers.push(Box::new(consumer));
+            fn register_consumer(&mut self, consumer: Box<dyn FileConsumer>) {
+                self.consumers.push(consumer);
             }
         }
     };

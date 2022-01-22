@@ -9,22 +9,21 @@ pub trait FileConsumer: Send + Sync {
 }
 
 pub trait FileProvider: Send + Sync {
-    fn register_consumer<T>(&mut self, consumer: T)
-    where
-        T: FileConsumer + 'static;
+    fn register_consumer(&mut self, consumer: Box<dyn FileConsumer>);
 }
 
-pub trait FileHandler {
-    fn handle_file(result: &ScannerResult);
+pub trait FileHandler<D> {
+    fn handle_file(result: &ScannerResult, data: Arc<D>);
 }
 
 pub trait HasConsumers {
     fn take_consumers(&self) -> Vec<Box<dyn FileConsumer>>;
 }
 
-pub trait HasWorker: FileHandler {
+pub trait HasWorker<D>: FileHandler<D> {
     fn worker(rx: Receiver<Arc<ScannerResult>>,
-        mut consumers: Vec<Box<dyn FileConsumer>>) {
+        mut consumers: Vec<Box<dyn FileConsumer>>,
+        data: Arc<D>) {
 
         let mut senders = generate_senders(consumers.iter_mut());
         loop {
@@ -34,7 +33,7 @@ pub trait HasWorker: FileHandler {
             };
 
             //FIXME: this could be spread over multiple threads
-            Self::handle_file(&result);
+            Self::handle_file(&result, Arc::clone(&data));
 
             for sender in senders.iter() {
                 match sender.send(Arc::clone(&result)) {

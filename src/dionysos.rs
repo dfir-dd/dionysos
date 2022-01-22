@@ -6,12 +6,13 @@ use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
 use crate::file_enumerator::*;
 use crate::consumer::*;
 use crate::yara_scanner::YaraScanner;
-use crate::filename_scanner::FilenameScanner;
+//use crate::filename_scanner::FilenameScanner;
 use crate::stdout_printer::StdoutPrinter;
 
 pub struct Dionysos {
     path: PathBuf,
     loglevel: LevelFilter,
+    yara_rules: Option<PathBuf>,
 }
 
 impl Dionysos {
@@ -22,13 +23,19 @@ impl Dionysos {
     pub fn run(&self) -> Result<()> {
         self.init_logging()?;
 
-        let mut enumerator = FileEnumerator::new(self.path.clone());
+        //let mut scanner_chain = FileEnumerator::new(self.path.clone());
+        let mut scanner_chain: Box<dyn FileConsumer> = Box::new(StdoutPrinter::default());
 
-        let mut yara_scanner = YaraScanner::default();
-        let mut filename_scanner = FilenameScanner::default();
-        yara_scanner.register_consumer(StdoutPrinter::default());
-        filename_scanner.register_consumer(yara_scanner);
-        enumerator.register_consumer(filename_scanner);
+        if let Some(ref yara_rules) = self.yara_rules {
+            let mut yara_scanner = YaraScanner::default();
+            yara_scanner.add_rules(yara_rules)?;
+            yara_scanner.seal();
+            yara_scanner.register_consumer(scanner_chain);
+            scanner_chain = Box::new(yara_scanner);
+        };
+
+        let mut enumerator = FileEnumerator::new(self.path.clone());
+        enumerator.register_consumer(scanner_chain);
         enumerator.run()?;
 
         Ok(())
@@ -100,9 +107,21 @@ impl Dionysos {
             _ => LevelFilter::Trace
         };
 
+        let yara_rules = match matches.value_of("YARA_RULES") {
+            None => None,
+            Some(p) => {
+                let yara_rules = PathBuf::from(&p);
+                if ! yara_rules.exists() {
+                    return Err(anyhow!("unable to read yara rules from '{}'", p));
+                }
+                Some(yara_rules)
+            }
+        };
+
         Ok(Self {
             path,
-            loglevel
+            loglevel,
+            yara_rules
         })
     }
 }
