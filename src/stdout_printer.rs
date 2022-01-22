@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use crate::consumer::*;
 use crate::scanner_result::ScannerResult;
-use provider_derive::*;
-use consumer_derive::*;
+use dionysos_provider_derive::*;
+use dionysos_consumer_derive::*;
 
 #[has_consumers_list] // FIXME: this struct does not need a consumers list
 #[has_thread_handle]

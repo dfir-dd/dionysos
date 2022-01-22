@@ -4,7 +4,7 @@ use crate::scanner_result::ScannerResult;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 use std::sync::Arc;
-use provider_derive::*;
+use dionysos_provider_derive::*;
 
 #[has_consumers_list]
 #[derive(FileProvider)]

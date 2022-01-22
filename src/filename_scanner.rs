@@ -1,7 +1,7 @@
 use crate::consumer::*;
 use crate::scanner_result::{ScannerResult, ScannerFinding};
-use provider_derive::*;
-use consumer_derive::*;
+use dionysos_provider_derive::*;
+use dionysos_consumer_derive::*;
 use std::sync::Arc;
 
 #[has_consumers_list]
