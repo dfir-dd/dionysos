@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::{App, Arg};
 use std::path::PathBuf;
+use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
 
 use crate::file_enumerator::*;
 use crate::consumer::*;
@@ -9,7 +10,8 @@ use crate::filename_scanner::FilenameScanner;
 use crate::stdout_printer::StdoutPrinter;
 
 pub struct Dionysos {
-    path: PathBuf
+    path: PathBuf,
+    loglevel: LevelFilter,
 }
 
 impl Dionysos {
@@ -18,6 +20,8 @@ impl Dionysos {
     }
 
     pub fn run(&self) -> Result<()> {
+        self.init_logging()?;
+
         let mut enumerator = FileEnumerator::new(self.path.clone());
 
         let mut yara_scanner = YaraScanner::default();
@@ -28,6 +32,14 @@ impl Dionysos {
         enumerator.run()?;
 
         Ok(())
+    }
+
+    fn init_logging(&self) -> Result<()> {
+        anyhow!(TermLogger::init(
+            self.loglevel,
+            Config::default(),
+            TerminalMode::Stderr,
+            ColorChoice::Auto))
     }
 
     fn parse_options() -> Result<Self> {
@@ -45,6 +57,14 @@ impl Dionysos {
                     .multiple_values(false)
                     .takes_value(true),
             )
+            .arg(
+                Arg::new("VERBOSITY")
+                    .help("level of verbosity (specify multiple times to increase verbosity")
+                    .short('v')
+                    .required(false)
+                    .takes_value(false)
+                    .multiple_occurrences(true)
+            )
             ;
         
         let matches = app.get_matches();
@@ -58,8 +78,18 @@ impl Dionysos {
             None => PathBuf::from("/"),
         };
 
+        let loglevel = match matches.occurrences_of("VERBOSITY") {
+            0 => LevelFilter::Off,
+            1 => LevelFilter::Error,
+            2 => LevelFilter::Warn,
+            3 => LevelFilter::Info,
+            4 => LevelFilter::Debug,
+            _ => LevelFilter::Trace
+        };
+
         Ok(Self {
-            path
+            path,
+            loglevel
         })
     }
 }
