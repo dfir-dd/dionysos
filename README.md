@@ -65,4 +65,4 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 - optional: curses fontend (???)
 - configuration of log level via command line
 - levensthein-scanner
-- use von one parameter for pass yara rules, who might be a file, a zip container or a directory
+- use of one parameter to pass yara rules, which might be a file, a zip container or a directory
