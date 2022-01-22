@@ -53,3 +53,16 @@ impl FileHandler for FilenameScanner {
 ### 3. Add your scanner to the scanner chain
 
 Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dionysis.rs))
+
+# Feature ideas
+
+- use yara rules, including modules (e.g. import "hash")
+- use lists of regular expressions for filesystem searches
+- write results to console / log
+- output must use an easy-to-parse format, while optionally staying human readable to best effort
+- highly optional: use the same list to search MFT & UsnJrnl in case files were deleted
+- usage via console, cmd args
+- optional: curses fontend (???)
+- configuration of log level via command line
+- levensthein-scanner
+- use von one parameter for pass yara rules, who might be a file, a zip container or a directory
