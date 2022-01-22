@@ -2,7 +2,7 @@
 name = "dionysos"
 version = "0.1.0"
 edition = "2021"
-description = "Scanner for certain IoCs"
+description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/regview"
 license-file = "LICENSE"
 

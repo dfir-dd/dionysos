@@ -1,19 +1,33 @@
 # `dionysos`
-Scanner for certain IoCs
+Scanner for various IoCs
+
+# Installation
+
+```shell
+cargo install dionysos
+```
 
 # Usage
 ```
 dionysos 0.1.0
 
-Scanner for certain IoCs
+Scanner for various IoCs
 
 USAGE:
     dionysos [OPTIONS]
 
 OPTIONS:
-    -h, --help           Print help information
-    -P, --path <PATH>    path to registry hive file
-    -V, --version        Print version information
+    -F, --filename <FILENAME_REGEX>    regular expression to match against the basename of files.
+                                       This parameter can be specified multiple times
+    -h, --help                         Print help information
+    -P, --path <PATH>                  path to registry hive file
+    -v                                 level of verbosity (specify multiple times to increase
+                                       verbosity
+    -V, --version                      Print version information
+    -Y, --yara <YARA_RULES>            use yara scanner with the specified ruleset. This can be a
+                                       single file, a zip file or a directory containing lots of
+                                       yara files. Yara files must end with 'yar' or 'yara', and zip
+                                       files must end with 'zip'
 ```
 
 # Developer guide
@@ -33,21 +47,41 @@ use crate::consumer::*;
 use crate::scanner_result::{ScannerResult, ScannerFinding};
 use provider_derive::*;
 use consumer_derive::*;
+use std::sync::Arc;
 
 #[has_consumers_list]
 #[has_thread_handle]
 #[derive(FileProvider)]
 #[derive(FileConsumer)]
 #[derive(Default)]
-pub struct FilenameScanner {}
+pub struct FilenameScanner {
+    #[consumer_data]
+    patterns: Arc<Vec<regex::Regex>>,
 
-impl FileHandler for FilenameScanner {
-    fn handle_file(result: &ScannerResult) {
-        if result.filename().ends_with(".rs") {
-            result.add_finding(ScannerFinding::Filename("*.rs".to_owned()));
-        }        
+    unsealed_patterns: Vec<regex::Regex>,
+}
+
+impl FilenameScanner {
+    pub fn seal(&mut self) {
+        self.patterns = Arc::new(std::mem::take(&mut self.unsealed_patterns));
+    }
+
+    pub fn add_patterns(&mut self, mut patterns: Vec<regex::Regex>) {
+        self.unsealed_patterns.append(&mut patterns);
     }
 }
+
+
+impl FileHandler<Vec<regex::Regex>> for FilenameScanner {
+    fn handle_file(result: &ScannerResult, patterns: Arc<Vec<regex::Regex>>) {
+        for p in patterns.iter() {
+            if p.is_match(result.filename()) {
+                result.add_finding(ScannerFinding::Filename(p.to_string()));
+            }
+        }
+    }
+}
+
 ```
 
 ### 3. Add your scanner to the scanner chain
