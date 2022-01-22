@@ -17,5 +17,5 @@ walkdir = "2"
 yara = "0.12"
 zip = "0.5"
 regex = "1.5"
-provider-derive = { path = "provider-derive" }
-consumer-derive = { path = "consumer-derive" }
+provider-derive = { path = "provider-derive", version="0.1" }
+consumer-derive = { path = "consumer-derive", version="0.1"  }
