@@ -90,13 +90,14 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 
 # Feature ideas
 
-- use yara rules, including modules (e.g. import "hash")
-- use lists of regular expressions for filesystem searches
-- write results to console / log
-- output must use an easy-to-parse format, while optionally staying human readable to best effort
-- highly optional: use the same list to search MFT & UsnJrnl in case files were deleted
-- usage via console, cmd args
-- optional: curses fontend (???)
-- configuration of log level via command line
-- levensthein-scanner
-- use of one parameter to pass yara rules, which might be a file, a zip container or a directory
+- [x] use yara rules,
+- [ ] including modules (e.g. import "hash")
+- [x] use lists of regular expressions for filesystem searches
+- [ ] write results to console / log
+- [ ] output must use an easy-to-parse format, while optionally staying human readable to best effort
+- [ ] highly optional: use the same list to search MFT & UsnJrnl in case files were deleted
+- [x] usage via console, cmd args
+- [ ] optional: curses fontend (???)
+- [x] configuration of log level via command line
+- [ ] levensthein-scanner
+- [x] use of one parameter to pass yara rules, which might be a file, a zip container or a directory
