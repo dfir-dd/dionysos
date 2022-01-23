@@ -69,7 +69,7 @@ impl Dionysos {
             .about(env!("CARGO_PKG_DESCRIPTION"))
             .arg(
                 Arg::new("PATH")
-                    .help("path to registry hive file")
+                    .help("path which must be scanned")
                     .long("path")
                     .short('P')
                     .required(false)

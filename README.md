@@ -9,7 +9,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.1.0
+dionysos 0.1.1
 
 Scanner for various IoCs
 
@@ -20,7 +20,7 @@ OPTIONS:
     -F, --filename <FILENAME_REGEX>    regular expression to match against the basename of files.
                                        This parameter can be specified multiple times
     -h, --help                         Print help information
-    -P, --path <PATH>                  path to registry hive file
+    -P, --path <PATH>                  path which must be scanned
     -v                                 level of verbosity (specify multiple times to increase
                                        verbosity
     -V, --version                      Print version information
