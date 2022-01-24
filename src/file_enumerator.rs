@@ -4,7 +4,7 @@ use crate::scanner_result::ScannerResult;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 use std::sync::Arc;
-use dionysos_provider_derive::*;
+use dionysos_derives::*;
 
 #[derive(FileProvider)]
 pub struct FileEnumerator {

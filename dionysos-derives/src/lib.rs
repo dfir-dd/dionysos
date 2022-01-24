@@ -1,8 +1,32 @@
 use proc_macro::{self, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, parse::Parser};
-use dionysos_synhelper::*;
-use proc_macro_error::*;
+
+mod find_fields;
+use find_fields::*;
+
+#[proc_macro_derive(FileProvider, attributes(consumers_list))]
+pub fn derive_file_provider(input: TokenStream) -> TokenStream {
+    let ast: syn::DeriveInput = syn::parse(input).unwrap();
+    let ident = &ast.ident;
+    
+    let fields = find_fields_by_attrname(&ast, "consumers_list");
+    let consumers_list = match fields.len() {
+        0 => panic!("no field with attribute consumers_list found"),
+        1 => &fields[0],
+        _ => panic!("multiple fields with #[consumers_list] defined")
+    };
+
+    let cl_ident = &consumers_list.ident;
+
+    let output = quote! {
+        impl FileProvider for #ident {
+            fn register_consumer(&mut self, consumer: Box<dyn FileConsumer>) {
+                self.#cl_ident.push(consumer);
+            }
+        }
+    };
+    output.into()
+}
 
 #[proc_macro_derive(FileConsumer, attributes(consumer_data, thread_handle))]
 pub fn derive_file_consumer(input: TokenStream) -> TokenStream {
@@ -13,14 +37,14 @@ pub fn derive_file_consumer(input: TokenStream) -> TokenStream {
     let consumers_list = match fields.len() {
         0 => None,
         1 => fields.into_iter().next(),
-        _ => abort!("multiple fields with #[consumers_list] defined")
+        _ => panic!("multiple fields with #[consumers_list] defined")
     };
 
     let fields = find_fields_by_attrname(&ast, "thread_handle");
     let thread_handle = match fields.len() {
-        0 => abort!("no field with attribute thread_handle found"),
+        0 => panic!("no field with attribute thread_handle found"),
         1 => &fields[0],
-        _ => abort!("multiple fields with #[thread_handle] defined")
+        _ => panic!("multiple fields with #[thread_handle] defined")
     };
 
 
@@ -31,7 +55,7 @@ pub fn derive_file_consumer(input: TokenStream) -> TokenStream {
             let field = &fields[0];
             Some((field.ident.clone().unwrap(), field.ty.clone()))
         }
-        _ => abort!("multiple fields with #[consumer_data] defined")
+        _ => panic!("multiple fields with #[consumer_data] defined")
     };
 
     if let Some(cd) = consumer_data.take() {

@@ -1,7 +1,6 @@
 use crate::consumer::*;
 use crate::scanner_result::{ScannerResult, ScannerFinding};
-use dionysos_provider_derive::*;
-use dionysos_consumer_derive::*;
+use dionysos_derives::*;
 use std::sync::Arc;
 
 #[derive(FileProvider)]
