@@ -1,6 +1,6 @@
 use proc_macro::{self, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, parse::Parser};
+use syn;
 use dionysos_synhelper::*;
 
 #[proc_macro_derive(FileProvider, attributes(consumers_list))]
