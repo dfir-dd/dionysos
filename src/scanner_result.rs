@@ -4,7 +4,8 @@ use crate::yara_scanner::YaraFinding;
 
 pub enum ScannerFinding {
     Yara(YaraFinding),
-    Filename(String)
+    Filename(String),
+    Levenshtein(String),
 }
 
 pub struct ScannerResult {
@@ -15,6 +16,10 @@ pub struct ScannerResult {
 impl ScannerResult {
     pub fn filename(&self) -> &str {
         self.filename.to_str().as_ref().unwrap()
+    }
+
+    pub fn raw_filename(&self) -> &PathBuf {
+        &self.filename
     }
 
     pub fn add_finding(&self, finding: ScannerFinding) {

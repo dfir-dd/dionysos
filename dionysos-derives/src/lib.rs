@@ -101,7 +101,7 @@ pub fn derive_file_consumer(input: TokenStream) -> TokenStream {
         Some(cl) => {
             let cl_ident = &cl.ident;
             quote! {
-                lstd::mem::take(&mut self.#cl_ident)
+                std::mem::take(&mut self.#cl_ident)
             }
         }
         None => {

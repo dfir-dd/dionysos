@@ -9,12 +9,14 @@ use crate::consumer::*;
 use crate::yara_scanner::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
 use crate::stdout_printer::StdoutPrinter;
+use crate::levenshtein_scanner::LevenshteinScanner;
 
 pub struct Dionysos {
     path: PathBuf,
     loglevel: LevelFilter,
     yara_rules: Option<PathBuf>,
     filenames: Vec<regex::Regex>,
+    omit_levenshtein: bool
 }
 
 impl Dionysos {
@@ -38,6 +40,12 @@ impl Dionysos {
             let mut filename_scanner = FilenameScanner::new(self.filenames.clone());
             filename_scanner.register_consumer(scanner_chain);
             scanner_chain = Box::new(filename_scanner);
+        }
+
+        if !self.omit_levenshtein {
+            let mut levenshtein_scanner = LevenshteinScanner::default();
+            levenshtein_scanner.register_consumer(scanner_chain);
+            scanner_chain = Box::new(levenshtein_scanner);
         }
 
         let mut enumerator = FileEnumerator::new(self.path.clone());
@@ -101,6 +109,14 @@ impl Dionysos {
                     .multiple_occurrences(true)
                     .takes_value(true)
             )
+            .arg(
+                Arg::new("OMIT_LEVENSHTEIN")
+                    .help("do not run the Levenshtein scanner")
+                    .long("omit-levenshtein")
+                    .required(false)
+                    .takes_value(false)
+                    .multiple_occurrences(false)
+            )
             ;
         
         let matches = app.get_matches();
@@ -150,7 +166,8 @@ impl Dionysos {
             path,
             loglevel,
             yara_rules,
-            filenames
+            filenames,
+            omit_levenshtein: matches.is_present("OMIT_LEVENSHTEIN")
         })
     }
 }
