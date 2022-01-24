@@ -3,7 +3,7 @@ name = "dionysos"
 version = "0.1.2"
 edition = "2018"
 description = "Scanner for various IoCs"
-homepage = "https://www.github.com/janstarke/regview"
+homepage = "https://www.github.com/janstarke/dionysos"
 license = "GPL-3.0"
 authors = ["Jan Starke <Jan.Starke@t-systems.com>"]
 

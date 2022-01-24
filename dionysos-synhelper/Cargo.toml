@@ -5,6 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 authors = ["Jan Starke <Jan.Starke@t-systems.com>"]
 description = "helper crate for derive crate for dionysos: Scanner for various IoCs"
+homepage = "https://www.github.com/janstarke/dionysos"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
