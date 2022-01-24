@@ -3,7 +3,7 @@ use quote::quote;
 use syn::{parse_macro_input, DeriveInput, parse::Parser};
 use dionysos_synhelper::*;
 
-#[proc_macro_derive(FileConsumer, attributes(consumer_data))]
+#[proc_macro_derive(FileConsumer, attributes(consumer_data, thread_handle))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
     let ident = &ast.ident;
@@ -14,6 +14,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
         1 => fields.into_iter().next(),
         _ => panic!("multiple fields with #[consumers_list] defined")
     };
+
+    let fields = find_fields_by_attrname(&ast, "thread_handle");
+    let thread_handle = match fields.len() {
+        0 => panic!("no field with attribute thread_handle found"),
+        1 => &fields[0],
+        _ => panic!("multiple fields with #[thread_handle] defined")
+    };
+
 
     let fields = find_fields_by_attrname(&ast, "consumer_data");
     let mut consumer_data = match fields.len() {
@@ -102,12 +110,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     };
 
+    let th_ident = &thread_handle.ident;
+
     let output = quote! {
         #has_worker
 
         impl FileConsumer for #ident {
             fn join(&mut self) {
-                if let Some(th) = self.thread_handle.take() {
+                if let Some(th) = self.#th_ident.take() {
                     match th.join() {
                         Err(why) => {
                             log::error!("join: {:?}", why);
@@ -122,28 +132,4 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     };
     output.into()
-}
-
-#[proc_macro_attribute]
-pub fn has_thread_handle(_args: TokenStream, input: TokenStream) -> TokenStream  {
-    let mut ast = parse_macro_input!(input as DeriveInput);
-    match &mut ast.data {
-        syn::Data::Struct(ref mut struct_data) => {           
-            match &mut struct_data.fields {
-                syn::Fields::Named(fields) => {
-                    fields
-                        .named
-                        .push(syn::Field::parse_named.parse2(quote! { thread_handle: Option<std::thread::JoinHandle<()>> }).unwrap());
-                }   
-                _ => {
-                    ()
-                }
-            }              
-            
-            return quote! {
-                #ast
-            }.into();
-        }
-        _ => panic!("`add_field` has to be used with structs "),
-    }
 }

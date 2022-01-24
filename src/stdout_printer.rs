@@ -4,11 +4,11 @@ use crate::scanner_result::ScannerResult;
 use dionysos_provider_derive::*;
 use dionysos_consumer_derive::*;
 
-#[has_thread_handle]
 #[derive(FileConsumer)]
 #[derive(Default)]
 pub struct StdoutPrinter {
-    
+    #[thread_handle]
+    thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 
