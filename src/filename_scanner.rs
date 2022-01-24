@@ -4,7 +4,6 @@ use dionysos_provider_derive::*;
 use dionysos_consumer_derive::*;
 use std::sync::Arc;
 
-#[has_consumers_list]
 #[has_thread_handle]
 #[derive(FileProvider)]
 #[derive(FileConsumer)]
@@ -14,6 +13,9 @@ pub struct FilenameScanner {
     patterns: Arc<Vec<regex::Regex>>,
 
     unsealed_patterns: Vec<regex::Regex>,
+
+    #[consumers_list]
+    consumers: Vec<Box<dyn FileConsumer>>
 }
 
 impl FilenameScanner {

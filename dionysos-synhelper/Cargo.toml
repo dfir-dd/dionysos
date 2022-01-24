@@ -1,18 +1,12 @@
 [package]
-name = "dionysos-consumer-derive"
+name = "dionysos-synhelper"
 version = "0.1.1"
-edition = "2018"
+edition = "2021"
 license = "GPL-3.0"
 authors = ["Jan Starke <Jan.Starke@t-systems.com>"]
-description = "derive crate for dionysos: Scanner for various IoCs"
+description = "helper crate for derive crate for dionysos: Scanner for various IoCs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-proc-macro2 = "1.0"
-quote = "1.0"
 syn = { version = "1.0", features = ["full"] }
-dionysos-synhelper = {path="../dionysos-synhelper", version="0.1"}
-
-[lib]
-proc-macro = true

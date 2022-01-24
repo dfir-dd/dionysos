@@ -1,39 +1,29 @@
 use proc_macro::{self, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, parse::Parser};
+use dionysos_synhelper::*;
 
 #[proc_macro_derive(FileConsumer, attributes(consumer_data))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
     let ident = &ast.ident;
 
-    let mut consumer_data: Option<(proc_macro2::Ident, syn::Type)> = None;
-    match ast.data {
-        syn::Data::Struct(ref data_struct) => match data_struct.fields {
-            syn::Fields::Named(ref fields_named) => {
-                for field in fields_named.named.iter() {
-                    for attr in field.attrs.iter() {
-                        match attr.parse_meta().unwrap() {
-                            syn::Meta::Path(ref path)
-                                    if path
-                                        .get_ident()
-                                        .unwrap()
-                                        .to_string()
-                                        == "consumer_data" => {
-                                    let item = field.clone();
-                                    consumer_data = Some((item.ident.unwrap(), item.ty));
-                                    break;
-                                }
-                            _ => ()
-                        }
-                    }
-                    if consumer_data.is_some() { break; }
-                }
-            }
-            _ => ()
+    let fields = find_fields_by_attrname(&ast, "consumers_list");
+    let consumers_list = match fields.len() {
+        0 => None,
+        1 => fields.into_iter().next(),
+        _ => panic!("multiple fields with #[consumers_list] defined")
+    };
+
+    let fields = find_fields_by_attrname(&ast, "consumer_data");
+    let mut consumer_data = match fields.len() {
+        0 => None,
+        1 =>  {
+            let field = &fields[0];
+            Some((field.ident.clone().unwrap(), field.ty.clone()))
         }
-        _ => ()
-    }
+        _ => panic!("multiple fields with #[consumer_data] defined")
+    };
 
     if let Some(cd) = consumer_data.take() {
         let outer_type = cd.1.clone();
@@ -74,12 +64,26 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     };
 
+    let consumers_ref = match consumers_list {
+        Some(cl) => {
+            let cl_ident = &cl.ident;
+            quote! {
+                lstd::mem::take(&mut self.#cl_ident)
+            }
+        }
+        None => {
+            quote!{
+                Vec::new()
+            }
+        }
+    };
+
     let start_with = match consumer_data {
         None => {
             quote!{
                 fn start_with(&mut self, receiver: std::sync::mpsc::Receiver<std::sync::Arc<ScannerResult>>) {
                     let dummy = Arc::new(());
-                    let consumers = std::mem::take(&mut self.consumers);
+                    let consumers = #consumers_ref;
                     let handle = std::thread::spawn(|| Self::worker(receiver, consumers, dummy));
                     self.thread_handle = Some(handle);
                 }

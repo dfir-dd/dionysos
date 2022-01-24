@@ -28,7 +28,6 @@ impl From<&yara::Rule<'_>> for YaraFinding {
     }
 }
 
-#[has_consumers_list]
 #[has_thread_handle]
 #[derive(FileProvider)]
 #[derive(FileConsumer)]
@@ -36,7 +35,11 @@ impl From<&yara::Rule<'_>> for YaraFinding {
 pub struct YaraScanner {
     #[consumer_data]
     data: Arc<Vec<yara::Rules>>,
-    unsealed_data: Vec<yara::Rules>
+    unsealed_data: Vec<yara::Rules>,
+
+
+    #[consumers_list]
+    consumers: Vec<Box<dyn FileConsumer>>
 }
 
 impl YaraScanner {

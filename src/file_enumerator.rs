@@ -6,10 +6,12 @@ use walkdir::WalkDir;
 use std::sync::Arc;
 use dionysos_provider_derive::*;
 
-#[has_consumers_list]
 #[derive(FileProvider)]
 pub struct FileEnumerator {
     path: PathBuf,
+    
+    #[consumers_list]
+    consumers: Vec<Box<dyn FileConsumer>>
 }
 
 impl FileEnumerator {
