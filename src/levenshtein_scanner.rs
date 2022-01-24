@@ -16,7 +16,7 @@ pub struct LevenshteinScanner {
 
 impl FileHandler<()> for LevenshteinScanner {
     fn handle_file(result: &ScannerResult, _data: Arc<()>) {
-        static WELLKNOWN_FILES: Vec<&str> = vec![
+        static WELLKNOWN_FILES: [&'static str; 8] = [
             "svchost.exe",
             "exporer.exe",
             "iexplore.exe",
