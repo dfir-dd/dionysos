@@ -18,7 +18,4 @@ walkdir = "2"
 yara = "0.12"
 zip = "0.5"
 regex = "1.5"
-dionysos-derives = { path = "dionysos-derives", version = "0.1" }
-dionysos-consumer-derive = "0.1.2"
-#dionysos-provider-derive = {path="provider-derive", version="0.1"}
-#dionysos-consumer-derive = {path="consumer-derive", version="0.1"}
+dionysos-derives = "0.1"

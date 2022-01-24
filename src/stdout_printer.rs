@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crate::consumer::*;
 use crate::scanner_result::ScannerResult;
-use dionysos_consumer_derive::*;
+use dionysos_derives::*;
 
 #[derive(FileConsumer)]
 #[derive(Default)]
