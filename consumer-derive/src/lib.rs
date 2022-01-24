@@ -2,9 +2,10 @@ use proc_macro::{self, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, parse::Parser};
 use dionysos_synhelper::*;
+use proc_macro_error::*;
 
 #[proc_macro_derive(FileConsumer, attributes(consumer_data, thread_handle))]
-pub fn derive(input: TokenStream) -> TokenStream {
+pub fn derive_file_consumer(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
     let ident = &ast.ident;
 
@@ -12,14 +13,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let consumers_list = match fields.len() {
         0 => None,
         1 => fields.into_iter().next(),
-        _ => panic!("multiple fields with #[consumers_list] defined")
+        _ => abort!("multiple fields with #[consumers_list] defined")
     };
 
     let fields = find_fields_by_attrname(&ast, "thread_handle");
     let thread_handle = match fields.len() {
-        0 => panic!("no field with attribute thread_handle found"),
+        0 => abort!("no field with attribute thread_handle found"),
         1 => &fields[0],
-        _ => panic!("multiple fields with #[thread_handle] defined")
+        _ => abort!("multiple fields with #[thread_handle] defined")
     };
 
 
@@ -30,7 +31,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             let field = &fields[0];
             Some((field.ident.clone().unwrap(), field.ty.clone()))
         }
-        _ => panic!("multiple fields with #[consumer_data] defined")
+        _ => abort!("multiple fields with #[consumer_data] defined")
     };
 
     if let Some(cd) = consumer_data.take() {

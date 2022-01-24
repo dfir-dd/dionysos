@@ -30,23 +30,15 @@ impl From<&yara::Rule<'_>> for YaraFinding {
 
 #[derive(FileProvider)]
 #[derive(FileConsumer)]
-#[derive(Default)]
 pub struct YaraScanner {
     #[consumer_data]
-    data: Arc<Vec<yara::Rules>>,
-    unsealed_data: Vec<yara::Rules>,
+    rules: Arc<Vec<yara::Rules>>,
 
     #[consumers_list]
     consumers: Vec<Box<dyn FileConsumer>>,
 
     #[thread_handle]
     thread_handle: Option<std::thread::JoinHandle<()>>,
-}
-
-impl YaraScanner {
-    pub fn seal(&mut self) {
-        self.data = Arc::new(std::mem::take(&mut self.unsealed_data));
-    }
 }
 
 impl FileHandler<Vec<yara::Rules>> for YaraScanner {
@@ -67,27 +59,33 @@ impl FileHandler<Vec<yara::Rules>> for YaraScanner {
 }
 
 impl YaraScanner {
-    pub fn add_rules<P>(&mut self, path: P) -> Result<()> where P: AsRef<Path> {
+    pub fn new<P>(path: P) -> Result<Self> where P: AsRef<Path> {
+        let mut rules = Vec::new();
         let metadata = std::fs::metadata(&path)?;
         if metadata.is_file() {
             if Self::points_to_zip_file(&path)? {
-                self.add_rules_from_zip(&path)?;
+                Self::add_rules_from_zip(&mut rules, &path)?;
             } else if Self::points_to_yara_file(&path)? {
-                self.add_rules_from_yara(path)?;
+                Self::add_rules_from_yara(&mut rules, path)?;
             } else {
                 log::warn!("file '{}' is neither a yara nor a zip file; I'll ignore it", path.as_ref().display());
             }
         } else {
-            self.add_rules_from_directory(path)?;
+            Self::add_rules_from_directory(&mut rules, path)?;
         }
-        Ok(())
+
+        Ok(Self {
+            rules: Arc::new(rules),
+            consumers: Vec::new(),
+            thread_handle: None,
+        })
     }
 
-    fn add_rules_from_yara<P>(&mut self, path: P) -> Result<()> where P: AsRef<Path> {
-        self.add_rules_from_stream(&path, &mut BufReader::new(File::open(&path)?))
+    fn add_rules_from_yara<P>(rules: &mut Vec<yara::Rules>, path: P) -> Result<()> where P: AsRef<Path> {
+        Self::add_rules_from_stream(rules, &path, &mut BufReader::new(File::open(&path)?))
     }
 
-    fn add_rules_from_stream<P, R>(&mut self, path: P, stream: &mut R) -> Result<()> where P: AsRef<Path>, R: std::io::Read {
+    fn add_rules_from_stream<P, R>(my_rules: &mut Vec<yara::Rules>, path: P, stream: &mut R) -> Result<()> where P: AsRef<Path>, R: std::io::Read {
         log::info!("parsing yara file: '{}'", path.as_ref().display());
         let mut yara_content = String::new();
         stream.read_to_string(&mut yara_content)?;
@@ -98,7 +96,7 @@ impl YaraScanner {
             Ok(compiler) => {
                 match compiler.compile_rules() {
                     Ok(rules) => {
-                        self.unsealed_data.push(rules);
+                        my_rules.push(rules);
                     }
                     Err(why) => {
                         log::warn!("yara: compiler error in '{}'", path.as_ref().display());
@@ -115,7 +113,7 @@ impl YaraScanner {
         Ok(())
     }
 
-    fn add_rules_from_zip<P>(&mut self, path: P) -> Result<()> where P: AsRef<Path> {
+    fn add_rules_from_zip<P>(rules: &mut Vec<yara::Rules>, path: P) -> Result<()> where P: AsRef<Path> {
         let zip_file = BufReader::new(File::open(&path)?);
         let mut zip = zip::ZipArchive::new(zip_file)?;
         for i in 0..zip.len() {
@@ -127,7 +125,7 @@ impl YaraScanner {
                             if Self::is_yara_filename(name) {
                                 // create PathBuf to let rust release all immutable borrows of `file`
                                 let file_path = file_path.to_path_buf();
-                                self.add_rules_from_stream(file_path.to_path_buf(), &mut file)?;
+                                Self::add_rules_from_stream(rules, file_path.to_path_buf(), &mut file)?;
                             }
                         }
                         None => {
@@ -143,11 +141,11 @@ impl YaraScanner {
         Ok(())
     }
     
-    fn add_rules_from_directory<P>(&mut self, path: P) -> Result<()> where P: AsRef<Path> {
+    fn add_rules_from_directory<P>(rules: &mut Vec<yara::Rules>, path: P) -> Result<()> where P: AsRef<Path> {
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if Self::points_to_yara_file(&path)? {
-                self.add_rules_from_yara(path)?;
+                Self::add_rules_from_yara(rules, path)?;
             }
         }
         Ok(())

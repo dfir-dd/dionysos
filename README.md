@@ -45,32 +45,32 @@ Take, for example, the `FilenameScanner`, which tries to do a simple filename ma
 ```rust
 use crate::consumer::*;
 use crate::scanner_result::{ScannerResult, ScannerFinding};
-use provider_derive::*;
-use consumer_derive::*;
+use dionysos_provider_derive::*;
+use dionysos_consumer_derive::*;
 use std::sync::Arc;
 
-#[has_consumers_list]
-#[has_thread_handle]
 #[derive(FileProvider)]
 #[derive(FileConsumer)]
-#[derive(Default)]
 pub struct FilenameScanner {
     #[consumer_data]
     patterns: Arc<Vec<regex::Regex>>,
 
-    unsealed_patterns: Vec<regex::Regex>,
+    #[consumers_list]
+    consumers: Vec<Box<dyn FileConsumer>>,
+
+    #[thread_handle]
+    thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl FilenameScanner {
-    pub fn seal(&mut self) {
-        self.patterns = Arc::new(std::mem::take(&mut self.unsealed_patterns));
-    }
-
-    pub fn add_patterns(&mut self, mut patterns: Vec<regex::Regex>) {
-        self.unsealed_patterns.append(&mut patterns);
+    pub fn new(patterns: Vec<regex::Regex>) -> Self {
+        Self {
+            patterns: Arc::new(patterns),
+            consumers: Vec::default(),
+            thread_handle: None
+        }
     }
 }
-
 
 impl FileHandler<Vec<regex::Regex>> for FilenameScanner {
     fn handle_file(result: &ScannerResult, patterns: Arc<Vec<regex::Regex>>) {
@@ -81,7 +81,6 @@ impl FileHandler<Vec<regex::Regex>> for FilenameScanner {
         }
     }
 }
-
 ```
 
 ### 3. Add your scanner to the scanner chain

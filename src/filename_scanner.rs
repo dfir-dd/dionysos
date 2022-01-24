@@ -6,12 +6,9 @@ use std::sync::Arc;
 
 #[derive(FileProvider)]
 #[derive(FileConsumer)]
-#[derive(Default)]
 pub struct FilenameScanner {
     #[consumer_data]
     patterns: Arc<Vec<regex::Regex>>,
-
-    unsealed_patterns: Vec<regex::Regex>,
 
     #[consumers_list]
     consumers: Vec<Box<dyn FileConsumer>>,
@@ -21,15 +18,14 @@ pub struct FilenameScanner {
 }
 
 impl FilenameScanner {
-    pub fn seal(&mut self) {
-        self.patterns = Arc::new(std::mem::take(&mut self.unsealed_patterns));
-    }
-
-    pub fn add_patterns(&mut self, mut patterns: Vec<regex::Regex>) {
-        self.unsealed_patterns.append(&mut patterns);
+    pub fn new(patterns: Vec<regex::Regex>) -> Self {
+        Self {
+            patterns: Arc::new(patterns),
+            consumers: Vec::default(),
+            thread_handle: None
+        }
     }
 }
-
 
 impl FileHandler<Vec<regex::Regex>> for FilenameScanner {
     fn handle_file(result: &ScannerResult, patterns: Arc<Vec<regex::Regex>>) {

@@ -29,17 +29,13 @@ impl Dionysos {
         let mut scanner_chain: Box<dyn FileConsumer> = Box::new(StdoutPrinter::default());
 
         if let Some(ref yara_rules) = self.yara_rules {
-            let mut yara_scanner = YaraScanner::default();
-            yara_scanner.add_rules(yara_rules)?;
-            yara_scanner.seal();
+            let mut yara_scanner = YaraScanner::new(yara_rules)?;
             yara_scanner.register_consumer(scanner_chain);
             scanner_chain = Box::new(yara_scanner);
         };
 
         if !self.filenames.is_empty() {
-            let mut filename_scanner = FilenameScanner::default();
-            filename_scanner.add_patterns(self.filenames.clone());
-            filename_scanner.seal();
+            let mut filename_scanner = FilenameScanner::new(self.filenames.clone());
             filename_scanner.register_consumer(scanner_chain);
             scanner_chain = Box::new(filename_scanner);
         }
