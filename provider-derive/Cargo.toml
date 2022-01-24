@@ -13,7 +13,7 @@ homepage = "https://www.github.com/janstarke/dionysos"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "1.0", features = ["full"] }
-dionysos-synhelper = {path="../dionysos-synhelper", version="0.1"}
+dionysos-synhelper = "0.1"
 
 [lib]
 proc-macro = true
