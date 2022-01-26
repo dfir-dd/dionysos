@@ -1,6 +1,7 @@
 use yara;
 use anyhow::{Result, anyhow};
 use crate::consumer::*;
+use crate::worker::*;
 use crate::scanner_result::*;
 use dionysos_derives::*;
 use std::path::Path;

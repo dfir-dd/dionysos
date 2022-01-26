@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use crate::consumer::*;
+use crate::worker::*;
 use crate::scanner_result::ScannerResult;
 use dionysos_derives::*;
 

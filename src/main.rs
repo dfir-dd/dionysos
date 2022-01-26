@@ -8,6 +8,7 @@ mod filename_scanner;
 mod stdout_printer;
 mod scanner_result;
 mod levenshtein_scanner;
+mod worker;
 use dionysos::*;
 
 fn main() -> Result <()> {
