@@ -83,7 +83,7 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 - [ ] including modules (e.g. import "hash")
 - [x] use lists of regular expressions for filesystem searches
 - [ ] write results to console / log
-- [ ] output must use an easy-to-parse format, while optionally staying human readable to best effort
+- [x] output must use an easy-to-parse format, while optionally staying human readable to best effort
 - [ ] highly optional: use the same list to search MFT & UsnJrnl in case files were deleted
 - [x] usage via console, cmd args
 - [ ] optional: curses fontend (???)
