@@ -5,6 +5,7 @@ use std::path::{PathBuf};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
 use regex;
 use std::sync::Arc;
+use indicatif::ProgressBar;
 
 use crate::consumer::*;
 use crate::scanner_result::{ScannerFinding, ScannerResult};
@@ -45,7 +46,10 @@ impl Dionysos {
         }
 
         let mut results = Vec::new();
+        let progress = ProgressBar::new_spinner();
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
+            progress.set_message(entry.path().to_str().unwrap().to_owned());
+            progress.tick();
             let mut result = ScannerResult::from(entry.path());
             for scanner in scanners.iter() {
                 for res in scanner.scan_file(entry.path()).into_iter() {
@@ -62,6 +66,7 @@ impl Dionysos {
             }
             results.push(result);
         }
+        progress.finish_and_clear();
 
         for result in results.iter() {
             println!("{}", result);
