@@ -8,7 +8,7 @@ use std::sync::Arc;
 use indicatif::ProgressBar;
 
 use crate::consumer::*;
-use crate::scanner_result::{ScannerFinding, ScannerResult};
+use crate::scanner_result::{ScannerResult};
 use crate::yara_scanner::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
@@ -49,8 +49,7 @@ impl Dionysos {
         let count = WalkDir::new(&self.path).into_iter().count();
         let progress = ProgressBar::new(count as u64);
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
-            progress.set_message(entry.path().to_str().unwrap().to_owned());
-            progress.tick();
+            progress.inc(1);
             let mut result = ScannerResult::from(entry.path());
             for scanner in scanners.iter() {
                 for res in scanner.scan_file(entry.path()).into_iter() {
@@ -70,7 +69,9 @@ impl Dionysos {
         progress.finish_and_clear();
 
         for result in results.iter() {
-            println!("{}", result);
+            if result.has_findings() {
+                println!("{}", result);
+            }
         }
         
         Ok(())
