@@ -19,10 +19,6 @@ impl ScannerResult {
         self.filename.to_str().as_ref().unwrap()
     }
 
-    pub fn raw_filename(&self) -> &PathBuf {
-        &self.filename
-    }
-
     pub fn add_finding(&mut self, finding: ScannerFinding) {
         self.findings.push(finding);
     }

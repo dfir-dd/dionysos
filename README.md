@@ -9,8 +9,8 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.1.1
-
+dionysos 0.1.4
+Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
 USAGE:
@@ -20,6 +20,7 @@ OPTIONS:
     -F, --filename <FILENAME_REGEX>    regular expression to match against the basename of files.
                                        This parameter can be specified multiple times
     -h, --help                         Print help information
+        --omit-levenshtein             do not run the Levenshtein scanner
     -P, --path <PATH>                  path which must be scanned
     -v                                 level of verbosity (specify multiple times to increase
                                        verbosity
@@ -43,42 +44,31 @@ You should enhance the class `ScannerFinding` in [src/scanner_result.rs](src/sca
 Take, for example, the `FilenameScanner`, which tries to do a simple filename match:
 
 ```rust
-use crate::consumer::*;
-use crate::scanner_result::{ScannerResult, ScannerFinding};
-use dionysos_provider_derive::*;
-use dionysos_consumer_derive::*;
-use std::sync::Arc;
+use crate::filescanner::*;
+use crate::scanner_result::{ScannerFinding};
+use std::path::Path;
 
-#[derive(FileProvider)]
-#[derive(FileConsumer)]
 pub struct FilenameScanner {
-    #[consumer_data]
-    patterns: Arc<Vec<regex::Regex>>,
-
-    #[consumers_list]
-    consumers: Vec<Box<dyn FileConsumer>>,
-
-    #[thread_handle]
-    thread_handle: Option<std::thread::JoinHandle<()>>,
+    patterns: Vec<regex::Regex>,
 }
 
 impl FilenameScanner {
     pub fn new(patterns: Vec<regex::Regex>) -> Self {
-        Self {
-            patterns: Arc::new(patterns),
-            consumers: Vec::default(),
-            thread_handle: None
+        Self {   
+            patterns,
         }
     }
 }
 
-impl FileHandler<Vec<regex::Regex>> for FilenameScanner {
-    fn handle_file(result: &ScannerResult, patterns: Arc<Vec<regex::Regex>>) {
-        for p in patterns.iter() {
-            if p.is_match(result.filename()) {
-                result.add_finding(ScannerFinding::Filename(p.to_string()));
-            }
-        }
+impl FileScanner for FilenameScanner
+{
+    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+        let filename = file.to_str().unwrap();
+        self.patterns
+            .iter()
+            .filter(|p|p.is_match(&filename))
+            .map(|r|Ok(ScannerFinding::Filename(r.to_string())))
+            .collect()
     }
 }
 ```

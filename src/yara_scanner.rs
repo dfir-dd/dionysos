@@ -1,6 +1,6 @@
 use yara;
 use anyhow::{Result, anyhow};
-use crate::consumer::*;
+use crate::filescanner::*;
 use crate::scanner_result::*;
 use std::path::Path;
 use walkdir::WalkDir;

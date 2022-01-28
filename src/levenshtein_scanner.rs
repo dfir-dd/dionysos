@@ -1,4 +1,4 @@
-use crate::consumer::*;
+use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding};
 use std::path::Path;
 

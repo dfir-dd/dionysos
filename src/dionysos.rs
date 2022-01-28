@@ -1,5 +1,7 @@
 use anyhow::{Result, anyhow};
 use clap::{App, Arg};
+use futures::future;
+use futures::executor::block_on;
 use walkdir::WalkDir;
 use std::path::{PathBuf};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
@@ -7,7 +9,7 @@ use regex;
 use std::sync::Arc;
 use indicatif::ProgressBar;
 
-use crate::consumer::*;
+use crate::filescanner::*;
 use crate::scanner_result::{ScannerResult};
 use crate::yara_scanner::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
@@ -21,7 +23,7 @@ pub struct Dionysos {
     omit_levenshtein: bool
 }
 
-fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult{
+async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult {
     let mut result = ScannerResult::from(entry.path());
     for scanner in scanners.iter() {
         for res in scanner.scan_file(entry.path()).into_iter() {
@@ -68,11 +70,29 @@ impl Dionysos {
         let mut results = Vec::new();
         let count = WalkDir::new(&self.path).into_iter().count();
         let progress = ProgressBar::new(count as u64);
+        
+        let max_workers = 8;
+        let mut workers = Vec::new();
+
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
-            let result = handle_file(Arc::clone(&scanners), entry);
+            while workers.len() >= max_workers {
+                let selector_future = future::select_all(workers);
+                let (result, _, wrkrs) = block_on(selector_future);
+                results.push(result);
+                progress.inc(1);
+                workers = wrkrs;
+            }
+            workers.push(Box::pin(handle_file(Arc::clone(&scanners), entry)));
+        }
+
+        while ! workers.is_empty() {
+            let selector_future = future::select_all(workers);
+            let (result, _, wrkrs) = block_on(selector_future);
             results.push(result);
             progress.inc(1);
+            workers = wrkrs;
         }
+
         progress.finish_and_clear();
 
         for result in results.iter() {
