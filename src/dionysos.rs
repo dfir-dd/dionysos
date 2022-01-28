@@ -21,6 +21,24 @@ pub struct Dionysos {
     omit_levenshtein: bool
 }
 
+fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult{
+    let mut result = ScannerResult::from(entry.path());
+    for scanner in scanners.iter() {
+        for res in scanner.scan_file(entry.path()).into_iter() {
+            match res {
+                Err(why) => {
+                    log::error!("{}", why);
+                }
+
+                Ok(res) => {
+                    result.add_finding(res);
+                }
+            }
+        }
+    }
+    result
+}
+
 impl Dionysos {
     pub fn new() -> Result<Self> {
         Self::parse_options()
@@ -28,43 +46,32 @@ impl Dionysos {
 
     pub fn run(&self) -> Result<()> {
         self.init_logging()?;
-        let mut scanners: Vec<Arc<dyn FileScanner>> = Vec::new();
+        let mut scanners: Vec<Box<dyn FileScanner>> = Vec::new();
 
         if let Some(ref yara_rules) = self.yara_rules {
             let yara_scanner = YaraScanner::new(yara_rules)?;
-            scanners.push(Arc::new(yara_scanner));
+            scanners.push(Box::new(yara_scanner));
         };
 
         if !self.filenames.is_empty() {
             let filename_scanner = FilenameScanner::new(self.filenames.clone());
-            scanners.push(Arc::new(filename_scanner));
+            scanners.push(Box::new(filename_scanner));
         }
 
         if !self.omit_levenshtein {
             let levenshtein_scanner = LevenshteinScanner::default();
-            scanners.push(Arc::new(levenshtein_scanner));
+            scanners.push(Box::new(levenshtein_scanner));
         }
+
+        let scanners = Arc::new(scanners);
 
         let mut results = Vec::new();
         let count = WalkDir::new(&self.path).into_iter().count();
         let progress = ProgressBar::new(count as u64);
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
-            progress.inc(1);
-            let mut result = ScannerResult::from(entry.path());
-            for scanner in scanners.iter() {
-                for res in scanner.scan_file(entry.path()).into_iter() {
-                    match res {
-                        Err(why) => {
-                            log::error!("{}", why);
-                        }
-
-                        Ok(res) => {
-                            result.add_finding(res);
-                        }
-                    }
-                }
-            }
+            let result = handle_file(Arc::clone(&scanners), entry);
             results.push(result);
+            progress.inc(1);
         }
         progress.finish_and_clear();
 
