@@ -1,14 +1,15 @@
 use anyhow::{Result, anyhow};
 use clap::{App, Arg};
-use std::path::PathBuf;
+use walkdir::WalkDir;
+use std::path::{PathBuf};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
 use regex;
+use std::sync::Arc;
 
-use crate::file_enumerator::*;
 use crate::consumer::*;
+use crate::scanner_result::{ScannerFinding, ScannerResult};
 use crate::yara_scanner::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
-use crate::stdout_printer::StdoutPrinter;
 use crate::levenshtein_scanner::LevenshteinScanner;
 
 pub struct Dionysos {
@@ -26,32 +27,46 @@ impl Dionysos {
 
     pub fn run(&self) -> Result<()> {
         self.init_logging()?;
-
-        //let mut scanner_chain = FileEnumerator::new(self.path.clone());
-        let mut scanner_chain: Box<dyn FileConsumer> = Box::new(StdoutPrinter::default());
+        let mut scanners: Vec<Arc<dyn FileScanner>> = Vec::new();
 
         if let Some(ref yara_rules) = self.yara_rules {
-            let mut yara_scanner = YaraScanner::new(yara_rules)?;
-            yara_scanner.register_consumer(scanner_chain);
-            scanner_chain = Box::new(yara_scanner);
+            let yara_scanner = YaraScanner::new(yara_rules)?;
+            scanners.push(Arc::new(yara_scanner));
         };
 
         if !self.filenames.is_empty() {
-            let mut filename_scanner = FilenameScanner::new(self.filenames.clone());
-            filename_scanner.register_consumer(scanner_chain);
-            scanner_chain = Box::new(filename_scanner);
+            let filename_scanner = FilenameScanner::new(self.filenames.clone());
+            scanners.push(Arc::new(filename_scanner));
         }
 
         if !self.omit_levenshtein {
-            let mut levenshtein_scanner = LevenshteinScanner::default();
-            levenshtein_scanner.register_consumer(scanner_chain);
-            scanner_chain = Box::new(levenshtein_scanner);
+            let levenshtein_scanner = LevenshteinScanner::default();
+            scanners.push(Arc::new(levenshtein_scanner));
         }
 
-        let mut enumerator = FileEnumerator::new(self.path.clone());
-        enumerator.register_consumer(scanner_chain);
-        enumerator.run()?;
+        let mut results = Vec::new();
+        for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
+            let mut result = ScannerResult::from(entry.path());
+            for scanner in scanners.iter() {
+                for res in scanner.scan_file(entry.path()).into_iter() {
+                    match res {
+                        Err(why) => {
+                            log::error!("{}", why);
+                        }
 
+                        Ok(res) => {
+                            result.add_finding(res);
+                        }
+                    }
+                }
+            }
+            results.push(result);
+        }
+
+        for result in results.iter() {
+            println!("{}", result);
+        }
+        
         Ok(())
     }
 

@@ -1,14 +1,11 @@
 use yara;
 use anyhow::{Result, anyhow};
 use crate::consumer::*;
-use crate::worker::*;
 use crate::scanner_result::*;
-use dionysos_derives::*;
 use std::path::Path;
 use walkdir::WalkDir;
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::Arc;
 
 pub struct YaraFinding {
     pub identifier: String,
@@ -28,33 +25,26 @@ impl From<&yara::Rule<'_>> for YaraFinding {
     }
 }
 
-#[derive(FileProvider)]
-#[derive(FileConsumer)]
 pub struct YaraScanner {
-    #[consumer_data]
-    rules: Arc<Vec<yara::Rules>>,
-
-    #[consumers_list]
-    consumers: Vec<Box<dyn FileConsumer>>,
-
-    #[thread_handle]
-    thread_handle: Option<std::thread::JoinHandle<()>>,
+    rules: Vec<yara::Rules>,
 }
 
-impl FileHandler<Vec<yara::Rules>> for YaraScanner {
-    fn handle_file(result: &ScannerResult, data: Arc<Vec<yara::Rules>>) {
-        for rules in data.iter() {
-            match rules.scan_file(result.filename(), 120) {
+impl FileScanner for YaraScanner
+{
+    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+        
+        let mut results = Vec::new();
+        for rules in self.rules.iter() {
+            match rules.scan_file(&file, 120) {
                 Err(why) => {
-                    log::error!("yara scan error: {}", why);
+                    results.push(Err(anyhow!("yara scan error: {}", why)));
                 }
-                Ok(results) => {
-                    for rule in results {
-                        result.add_finding(ScannerFinding::Yara(YaraFinding::from(&rule)));
-                    }
+                Ok(res) => {
+                    results.extend(res.iter().map(|r| Ok(ScannerFinding::Yara(YaraFinding::from(r)))));
                 }
             }
         }
+        results
     }
 }
 
@@ -75,9 +65,7 @@ impl YaraScanner {
         }
 
         Ok(Self {
-            rules: Arc::new(rules),
-            consumers: Vec::new(),
-            thread_handle: None,
+            rules: rules,
         })
     }
 

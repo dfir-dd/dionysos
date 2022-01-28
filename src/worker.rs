@@ -1,5 +1,8 @@
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
+use futures::channel::mpsc;
+use futures::executor;
+use futures::executor::ThreadPool;
 use crate::scanner_result::*;
 use crate::consumer::*;
 
@@ -7,8 +10,10 @@ pub trait HasWorker<D>: FileHandler<D> {
     fn worker(rx: Receiver<Arc<ScannerResult>>,
         mut consumers: Vec<Box<dyn FileConsumer>>,
         data: Arc<D>) {
-
+        
+        let pool = ThreadPool::new().expect("Failed to build pool");
         let mut senders = generate_senders(consumers.iter_mut());
+
         loop {
             let result = match rx.recv() {
                 Err(_) => break,

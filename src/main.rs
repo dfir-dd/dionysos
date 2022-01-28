@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-mod file_enumerator;
+//mod file_enumerator;
 mod consumer;
 mod dionysos;
 mod yara_scanner;
 mod filename_scanner;
-mod stdout_printer;
+//mod stdout_printer;
 mod scanner_result;
 mod levenshtein_scanner;
-mod worker;
+//mod worker;
 use dionysos::*;
 
 fn main() -> Result <()> {

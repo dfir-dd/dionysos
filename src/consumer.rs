@@ -1,7 +1,8 @@
-use std::sync::mpsc::Receiver;
-use std::sync::Arc;
-use std::sync::mpsc::{channel, Sender};
 use crate::scanner_result::*;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
+use std::path::Path;
 
 pub trait FileConsumer: Send + Sync {
     fn start_with(&mut self, receiver: Receiver<Arc<ScannerResult>>);
@@ -14,6 +15,11 @@ pub trait FileProvider: Send + Sync {
 
 pub trait FileHandler<D> {
     fn handle_file(result: &ScannerResult, data: Arc<D>);
+}
+
+pub trait FileScanner
+{
+    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> ;
 }
 
 pub trait HasConsumers {

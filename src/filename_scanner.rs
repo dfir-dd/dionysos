@@ -1,39 +1,28 @@
 use crate::consumer::*;
-use crate::worker::*;
-use crate::scanner_result::{ScannerResult, ScannerFinding};
-use dionysos_derives::*;
-use std::sync::Arc;
+use crate::scanner_result::{ScannerFinding};
+use std::path::Path;
 
-#[derive(FileProvider)]
-#[derive(FileConsumer)]
 pub struct FilenameScanner {
-    #[consumer_data]
-    patterns: Arc<Vec<regex::Regex>>,
-
-    #[consumers_list]
-    consumers: Vec<Box<dyn FileConsumer>>,
-
-    #[thread_handle]
-    thread_handle: Option<std::thread::JoinHandle<()>>,
+    patterns: Vec<regex::Regex>,
 }
 
 impl FilenameScanner {
     pub fn new(patterns: Vec<regex::Regex>) -> Self {
-        Self {
-            patterns: Arc::new(patterns),
-            consumers: Vec::default(),
-            thread_handle: None
+        Self {   
+            patterns,
         }
     }
 }
 
-impl FileHandler<Vec<regex::Regex>> for FilenameScanner {
-    fn handle_file(result: &ScannerResult, patterns: Arc<Vec<regex::Regex>>) {
-        for p in patterns.iter() {
-            if p.is_match(result.filename()) {
-                result.add_finding(ScannerFinding::Filename(p.to_string()));
-            }
-        }
+impl FileScanner for FilenameScanner
+{
+    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+        let filename = file.to_str().unwrap();
+        self.patterns
+            .iter()
+            .filter(|p|p.is_match(&filename))
+            .map(|r|Ok(ScannerFinding::Filename(r.to_string())))
+            .collect()
     }
 }
 

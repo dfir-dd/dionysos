@@ -1,25 +1,16 @@
 use crate::consumer::*;
-use crate::worker::*;
-use crate::scanner_result::{ScannerResult, ScannerFinding};
-use dionysos_derives::*;
-use std::sync::Arc;
+use crate::scanner_result::{ScannerFinding};
+use std::path::Path;
 
-#[derive(FileProvider)]
-#[derive(FileConsumer)]
 #[derive(Default)]
 pub struct LevenshteinScanner {
-    #[consumers_list]
-    consumers: Vec<Box<dyn FileConsumer>>,
-
-    #[thread_handle]
-    thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
-impl FileHandler<()> for LevenshteinScanner {
-    fn handle_file(result: &ScannerResult, _data: Arc<()>) {
+impl FileScanner for LevenshteinScanner {
+    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
         static WELLKNOWN_FILES: [&'static str; 8] = [
             "svchost.exe",
-            "exporer.exe",
+            "explorer.exe",
             "iexplore.exe",
             "lsass.exe",
             "chrome.exe",
@@ -27,21 +18,15 @@ impl FileHandler<()> for LevenshteinScanner {
             "firefox.exe",
             "winlogon.exe"
         ];
-
-        match result.raw_filename().file_name() {
+        match file.to_str() {
             Some(os_fn) => {
-                match os_fn.to_str() {
-                    Some(basename) => {
-                        for wellknown_file in WELLKNOWN_FILES {
-                            if levenshtein::levenshtein(basename, wellknown_file) == 1 {
-                                result.add_finding(ScannerFinding::Levenshtein(wellknown_file.to_owned()));
-                            }
-                        }
-                    }
-                    None => ()
-                }
+                WELLKNOWN_FILES
+                    .iter()
+                    .filter(|l| levenshtein::levenshtein(os_fn, **l) == 1)
+                    .map(|l| Ok(ScannerFinding::Levenshtein((*l).to_owned())))
+                    .collect()
             }
-            None => return
+            None => vec![]
         }
     }
 }
