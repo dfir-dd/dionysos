@@ -46,7 +46,8 @@ impl Dionysos {
         }
 
         let mut results = Vec::new();
-        let progress = ProgressBar::new_spinner();
+        let count = WalkDir::new(&self.path).into_iter().count();
+        let progress = ProgressBar::new(count as u64);
         for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
             progress.set_message(entry.path().to_str().unwrap().to_owned());
             progress.tick();
