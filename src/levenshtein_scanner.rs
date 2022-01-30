@@ -22,7 +22,7 @@ impl FileScanner for LevenshteinScanner {
             Some(os_fn) => {
                 WELLKNOWN_FILES
                     .iter()
-                    .filter(|l| levenshtein::levenshtein(os_fn, **l) == 1)
+                    .filter(|l| has_levenshtein_distance_one(os_fn, **l))
                     .map(|l| Ok(ScannerFinding::Levenshtein((*l).to_owned())))
                     .collect()
             }
