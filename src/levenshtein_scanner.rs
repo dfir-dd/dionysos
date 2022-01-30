@@ -148,4 +148,21 @@ mod tests {
             }
         }
     }
+
+
+    #[test]
+    fn test_distance_more_than_one() {
+        let samples = vec![
+            "3xpl0rer.exe",
+            "expl0r3r.exe",
+            "3xpl0rer.exe"
+        ];
+        let scanner = LevenshteinScanner::default();
+        for sample_fn in samples {
+            let filename = env!("CARGO_MANIFEST_DIR").to_owned() + sample_fn;
+            let sample = PathBuf::from(&filename);
+            let results = scanner.scan_file(&sample);
+            assert!(results.is_empty(), "invalid result for {}", filename);
+        }
+    }
 }
