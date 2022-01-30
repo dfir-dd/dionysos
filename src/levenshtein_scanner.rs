@@ -1,13 +1,12 @@
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding};
 use std::path::Path;
-
-#[derive(Default)]
 pub struct LevenshteinScanner {
+    wellknown_files: Vec<Vec<char>>
 }
 
-impl FileScanner for LevenshteinScanner {
-    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+impl Default for LevenshteinScanner {
+    fn default() -> Self {
         static WELLKNOWN_FILES: [&'static str; 8] = [
             "svchost.exe",
             "explorer.exe",
@@ -18,15 +17,31 @@ impl FileScanner for LevenshteinScanner {
             "firefox.exe",
             "winlogon.exe"
         ];
-        match file.to_str() {
-            Some(os_fn) => {
-                WELLKNOWN_FILES
-                    .iter()
-                    .filter(|l| has_levenshtein_distance_one(os_fn, **l))
-                    .map(|l| Ok(ScannerFinding::Levenshtein((*l).to_owned())))
-                    .collect()
+        let wellknown_files = WELLKNOWN_FILES.iter().map(|s| s.chars().collect()).collect();
+        Self {
+            wellknown_files
+        }
+    }
+}
+
+impl FileScanner for LevenshteinScanner {
+    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+        match file.file_name() {
+            None => vec![],
+            Some(file_name) => match file_name.to_str() {
+                Some(os_fn) => {
+                    let res:  Vec<anyhow::Result<ScannerFinding>> = self.wellknown_files
+                        .iter()
+                        .filter(|l| has_levenshtein_distance_one(&os_fn.chars().collect(), l))
+                        .map(|l| Ok(ScannerFinding::Levenshtein(l.iter().collect())))
+                        .collect();
+                    if file_name == "expl0rer.exe" {
+                        assert_eq!(res.len(), 1);
+                    }
+                    res
+                }
+                None => vec![]
             }
-            None => vec![]
         }
     }
 }
@@ -41,8 +56,7 @@ impl FileScanner for LevenshteinScanner {
  *
  * Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>
  */
-#[must_use]
-pub fn has_levenshtein_distance_one(a: &str, b: &str) -> bool {
+pub fn has_levenshtein_distance_one(a: &Vec<char>, b: &Vec<char>) -> bool {
     let mut result = 0;
     let dist = 1;
 
@@ -51,8 +65,8 @@ pub fn has_levenshtein_distance_one(a: &str, b: &str) -> bool {
         return false;
     }
 
-    let length_a = a.chars().count();
-    let length_b = b.chars().count();
+    let length_a = a.len();
+    let length_b = b.len();
 
     if length_a == 0 {
         return length_b == dist;
@@ -60,6 +74,18 @@ pub fn has_levenshtein_distance_one(a: &str, b: &str) -> bool {
 
     if length_b == 0 {
         return length_a == dist;
+    }
+
+    // if both string lengths differ more than 1, their
+    // Levenshtein distance must be more than 1
+    if length_a > length_b {
+        if length_a - length_b > 1 {
+            return false;
+        }
+    } else {
+        if length_b - length_a > 1 {
+            return false;
+        }
     }
 
     /* Initialize the vector.
@@ -71,14 +97,11 @@ pub fn has_levenshtein_distance_one(a: &str, b: &str) -> bool {
     let mut distance_b;
 
     /* Loop. */
-    for (index_b, code_b) in b.chars().enumerate() {
+    for (index_b, code_b) in b.iter().enumerate() {
         result = index_b;
-        if result > dist {
-            return false;
-        }
         distance_a = index_b;
 
-        for (index_a, code_a) in a.chars().enumerate() {
+        for (index_a, code_a) in a.iter().enumerate() {
             distance_b = if code_a == code_b {
                 distance_a
             } else {
@@ -98,10 +121,6 @@ pub fn has_levenshtein_distance_one(a: &str, b: &str) -> bool {
             } else {
                 distance_b
             };
-
-            if result > dist {
-                return false;
-            }
 
             cache[index_a] = result;
         }
@@ -125,7 +144,6 @@ mod tests {
         let results = scanner.scan_file(&sample);
         assert!(results.is_empty(), "invalid result for {}", filename);
     }
-
 
     #[test]
     fn test_distance_one() {
