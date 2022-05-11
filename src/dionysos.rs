@@ -39,7 +39,11 @@ struct Cli {
     /// yara files. Yara files must end with 'yar' or 'yara', and zip
     /// files must end with 'zip'
     #[clap(short('Y'), long("yara"))]
-    yara: Option<String>
+    yara: Option<String>,
+
+    /// allow yara to scan compressed files
+    #[clap(short('C'), long("scan-compressed"))]
+    scan_compressed: bool,
 }
 
 pub struct Dionysos {
@@ -47,7 +51,8 @@ pub struct Dionysos {
     loglevel: LevelFilter,
     yara_rules: Option<PathBuf>,
     filenames: Vec<regex::Regex>,
-    omit_levenshtein: bool
+    omit_levenshtein: bool,
+    scan_compressed: bool,
 }
 
 async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult {
@@ -78,7 +83,8 @@ impl Dionysos {
         let mut scanners: Vec<Box<dyn FileScanner>> = Vec::new();
 
         if let Some(ref yara_rules) = self.yara_rules {
-            let yara_scanner = YaraScanner::new(yara_rules)?;
+            let yara_scanner = YaraScanner::new(yara_rules)?
+                .with_scan_compressed(self.scan_compressed);
             scanners.push(Box::new(yara_scanner));
         };
 
@@ -101,7 +107,10 @@ impl Dionysos {
         let max_workers = 8;
         let mut workers = Vec::new();
 
-        for entry in WalkDir::new(&self.path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(&self.path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().is_file()) {
             while workers.len() >= max_workers {
                 let selector_future = future::select_all(workers);
                 let (result, _, wrkrs) = block_on(selector_future);
@@ -177,7 +186,8 @@ impl Dionysos {
             loglevel: cli.verbose.log_level_filter(),
             yara_rules,
             filenames,
-            omit_levenshtein: cli.omit_levenshtein
+            omit_levenshtein: cli.omit_levenshtein,
+            scan_compressed: cli.scan_compressed
         })
     }
 }

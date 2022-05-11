@@ -1,11 +1,18 @@
+use filemagic::Magic;
 use yara;
 use anyhow::{Result, anyhow};
 use crate::filescanner::*;
 use crate::scanner_result::*;
+use std::cell::RefCell;
+use std::io::Read;
 use std::path::Path;
 use walkdir::WalkDir;
 use std::fs::File;
 use std::io::BufReader;
+use filemagic::magic;
+use flate2::read::GzDecoder;
+use xz::read::XzDecoder;
+use bzip2::read::BzDecoder;
 
 pub struct YaraFinding {
     pub identifier: String,
@@ -20,24 +27,85 @@ impl From<&yara::Rule<'_>> for YaraFinding {
         Self {
             identifier: rule.identifier.to_owned(),
             namespace: rule.namespace.to_owned(),
-            tags: rule.tags.iter().map(|s|String::from(*s)).collect()
+            tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
         }
     }
 }
 
 pub struct YaraScanner {
     rules: Vec<yara::Rules>,
+    scan_compressed: bool,
+    magic: Magic,
+    buffer: RefCell<Vec<u8>>
+}
+
+enum CompressionType {
+    GZip,
+    BZip2,
+    XZ,
+    Uncompressed
 }
 
 impl FileScanner for YaraScanner
 {
     fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
-        
         let mut results = Vec::new();
+
+        // check if the file is a compressed file
+        let compression_type = 
+        if self.scan_compressed {
+            let magic = match self.magic.file(file) {
+                Ok(magic) => {
+                    Some(magic)
+                }
+                Err(why) => { 
+                    log::warn!("unable to determin file type for '{}': {}",
+                        file.display(), why);
+                    None
+                }
+            };
+
+            if let Some(m) = &magic {
+                if m == "XZ compressed data"                    {CompressionType::XZ}
+                else if m.starts_with("gzip compressed data")   {CompressionType::GZip}
+                else if m.starts_with("bzip2 compressed data")  {CompressionType::BZip2}
+                else {CompressionType::Uncompressed}
+            } else {
+                CompressionType::Uncompressed
+            }
+        } else {
+            CompressionType::Uncompressed
+        };
+
+        self.buffer.borrow_mut().clear();
+
+        if let Err(why) = match compression_type {
+            CompressionType::GZip => {
+                let mut gz = GzDecoder::new(File::open(file).unwrap());
+                gz.read_to_end(&mut self.buffer.borrow_mut())
+            }
+            CompressionType::BZip2 => {
+                let mut bz = BzDecoder::new(File::open(file).unwrap());
+                bz.read_to_end(&mut self.buffer.borrow_mut())
+            }
+            CompressionType::XZ => {
+                let mut xz = XzDecoder::new(File::open(file).unwrap());
+                xz.read_to_end(&mut self.buffer.borrow_mut())
+            }
+            _ => Ok(0)
+        } {
+            return vec![Err(anyhow!(why))];
+        }
+
         for rules in self.rules.iter() {
-            match rules.scan_file(&file, 120) {
+            let scan_result = match self.buffer.borrow().is_empty() {
+                true => rules.scan_file(&file, 120),
+                false => rules.scan_mem(&self.buffer.borrow()[..], 120).or_else(|e| Err(yara::Error::Yara(e))),
+            };
+
+            match scan_result {
                 Err(why) => {
-                    results.push(Err(anyhow!("yara scan error: {}", why)));
+                    results.push(Err(anyhow!("yara scan error with '{}': {}", file.display(), why)));
                 }
                 Ok(res) => {
                     results.extend(res.iter().map(|r| Ok(ScannerFinding::Yara(YaraFinding::from(r)))));
@@ -66,7 +134,15 @@ impl YaraScanner {
 
         Ok(Self {
             rules: rules,
+            scan_compressed: false,
+            magic: magic!().unwrap(),
+            buffer: RefCell::new(Vec::with_capacity(1024*1024*128))
         })
+    }
+
+    pub fn with_scan_compressed(mut self, scan_compressed: bool) -> Self {
+        self.scan_compressed = scan_compressed;
+        self
     }
 
     fn add_rules_from_yara<P>(rules: &mut Vec<yara::Rules>, path: P) -> Result<()> where P: AsRef<Path> {

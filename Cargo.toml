@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "0.1.5"
+version = "0.2.0"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
@@ -21,3 +21,8 @@ zip = "0.5"
 regex = "1.5"
 indicatif = "0.16"
 futures = {version="0.3", features=["executor", "thread-pool"]}
+filemagic = "0"
+
+flate2 = "1"
+bzip2 = "0.4"
+xz = "0.1"
