@@ -92,3 +92,4 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 - [x] use of one parameter to pass yara rules, which might be a file, a zip container or a directory
 - [ ] Scan Windows Registry files
 - [ ] Scan Windows Event Logs
+- [ ] Scan compressed files
