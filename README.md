@@ -4,6 +4,7 @@ Scanner for various IoCs
 # Installation
 
 ```shell
+sudo apt install libyara-dev
 cargo install dionysos
 ```
 

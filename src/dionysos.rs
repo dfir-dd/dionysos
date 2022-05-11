@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use clap::{App, Arg};
+use clap::Parser;
 use futures::future;
 use futures::executor::block_on;
 use walkdir::WalkDir;
@@ -14,6 +14,33 @@ use crate::scanner_result::{ScannerResult};
 use crate::yara_scanner::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
+
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
+    
+    /// regular expression to match against the basename of files.
+    /// This parameter can be specified multiple times
+    #[clap(short('F'), long("filename"))]
+    filenames: Vec<String>,
+
+    /// do not run the Levenshtein scanner
+    #[clap(long("omit-levenshtein"))]
+    omit_levenshtein: bool,
+
+    /// path which must be scanned
+    #[clap(short('P'), long("path"))]
+    path: Option<String>,
+
+    /// use yara scanner with the specified ruleset. This can be a
+    /// single file, a zip file or a directory containing lots of
+    /// yara files. Yara files must end with 'yar' or 'yara', and zip
+    /// files must end with 'zip'
+    #[clap(short('Y'), long("yara"))]
+    yara: Option<String>
+}
 
 pub struct Dionysos {
     path: PathBuf,
@@ -116,60 +143,9 @@ impl Dionysos {
     }
 
     fn parse_options() -> Result<Self> {
-        let app = App::new(env!("CARGO_PKG_NAME"))
-            .version(env!("CARGO_PKG_VERSION"))
-            .author(env!("CARGO_PKG_AUTHORS"))
-            .about(env!("CARGO_PKG_DESCRIPTION"))
-            .arg(
-                Arg::new("PATH")
-                    .help("path which must be scanned")
-                    .long("path")
-                    .short('P')
-                    .required(false)
-                    .multiple_occurrences(false)
-                    .multiple_values(false)
-                    .takes_value(true),
-            )
-            .arg(
-                Arg::new("VERBOSITY")
-                    .help("level of verbosity (specify multiple times to increase verbosity")
-                    .short('v')
-                    .required(false)
-                    .takes_value(false)
-                    .multiple_occurrences(true)
-            )
-            .arg(
-                Arg::new("YARA_RULES")
-                    .help("use yara scanner with the specified ruleset. This can be a single file, a zip file or a directory containing lots of yara files. Yara files must end with 'yar' or 'yara', and zip files must end with 'zip'")
-                    .short('Y')
-                    .long("yara")
-                    .required(false)
-                    .multiple_occurrences(false)
-                    .multiple_values(false)
-                    .takes_value(true)
-            )
-            .arg(
-                Arg::new("FILENAME_REGEX")
-                    .help("regular expression to match against the basename of files. This parameter can be specified multiple times")
-                    .short('F')
-                    .long("filename")
-                    .required(false)
-                    .multiple_values(false)
-                    .multiple_occurrences(true)
-                    .takes_value(true)
-            )
-            .arg(
-                Arg::new("OMIT_LEVENSHTEIN")
-                    .help("do not run the Levenshtein scanner")
-                    .long("omit-levenshtein")
-                    .required(false)
-                    .takes_value(false)
-                    .multiple_occurrences(false)
-            )
-            ;
+        let cli = Cli::parse();
         
-        let matches = app.get_matches();
-        let path = match matches.value_of("PATH") {
+        let path = match cli.path {
             Some(path) => PathBuf::from(&path),
 
             #[cfg(target_os = "windows")]
@@ -179,16 +155,7 @@ impl Dionysos {
             None => PathBuf::from("/"),
         };
 
-        let loglevel = match matches.occurrences_of("VERBOSITY") {
-            0 => LevelFilter::Off,
-            1 => LevelFilter::Error,
-            2 => LevelFilter::Warn,
-            3 => LevelFilter::Info,
-            4 => LevelFilter::Debug,
-            _ => LevelFilter::Trace
-        };
-
-        let yara_rules = match matches.value_of("YARA_RULES") {
+        let yara_rules = match cli.yara {
             None => None,
             Some(p) => {
                 let yara_rules = PathBuf::from(&p);
@@ -199,24 +166,18 @@ impl Dionysos {
             }
         };
 
-        let filenames: Vec<regex::Regex> = match matches.values_of("FILENAME_REGEX") {
-            Some(f) => {
-                let mut filenames = Vec::new();
-                for s in f {
-                    let re = regex::Regex::new(s)?;
-                    filenames.push(re);
-                }
-                filenames
-            }
-            None => Vec::new(),
-        };
+        let filenames: Vec<regex::Regex> = cli.filenames.iter()
+            .map(|f| {
+                regex::Regex::new(f).unwrap()
+            })
+            .collect();
 
         Ok(Self {
             path,
-            loglevel,
+            loglevel: cli.verbose.log_level_filter(),
             yara_rules,
             filenames,
-            omit_levenshtein: matches.is_present("OMIT_LEVENSHTEIN")
+            omit_levenshtein: cli.omit_levenshtein
         })
     }
 }
