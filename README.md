@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.1.4
+dionysos 0.2.1
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -18,18 +18,19 @@ USAGE:
     dionysos [OPTIONS]
 
 OPTIONS:
-    -F, --filename <FILENAME_REGEX>    regular expression to match against the basename of files.
-                                       This parameter can be specified multiple times
-    -h, --help                         Print help information
-        --omit-levenshtein             do not run the Levenshtein scanner
-    -P, --path <PATH>                  path which must be scanned
-    -v                                 level of verbosity (specify multiple times to increase
-                                       verbosity
-    -V, --version                      Print version information
-    -Y, --yara <YARA_RULES>            use yara scanner with the specified ruleset. This can be a
-                                       single file, a zip file or a directory containing lots of
-                                       yara files. Yara files must end with 'yar' or 'yara', and zip
-                                       files must end with 'zip'
+    -C, --scan-compressed         allow yara to scan compressed files
+    -F, --filename <FILENAMES>    regular expression to match against the basename of files. This
+                                  parameter can be specified multiple times
+    -h, --help                    Print help information
+        --omit-levenshtein        do not run the Levenshtein scanner
+    -P, --path <PATH>             path which must be scanned
+    -q, --quiet                   Less output per occurrence
+    -v, --verbose                 More output per occurrence
+    -V, --version                 Print version information
+    -Y, --yara <YARA>             use yara scanner with the specified ruleset. This can be a single
+                                  file, a zip file or a directory containing lots of yara files.
+                                  Yara files must end with 'yar' or 'yara', and zip files must end
+                                  with 'zip'
 ```
 
 # Developer guide
@@ -76,7 +77,7 @@ impl FileScanner for FilenameScanner
 
 ### 3. Add your scanner to the scanner chain
 
-Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dionysis.rs))
+Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dionysos.rs))
 
 # Feature ideas
 
@@ -93,4 +94,4 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 - [x] use of one parameter to pass yara rules, which might be a file, a zip container or a directory
 - [ ] Scan Windows Registry files
 - [ ] Scan Windows Event Logs
-- [ ] Scan compressed files
+- [x] Scan compressed files (very slow at the moment)
