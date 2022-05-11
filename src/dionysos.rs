@@ -41,7 +41,7 @@ struct Cli {
     #[clap(short('Y'), long("yara"))]
     yara: Option<String>,
 
-    /// allow yara to scan compressed files
+    /// allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
     #[clap(short('C'), long("scan-compressed"))]
     scan_compressed: bool,
 
