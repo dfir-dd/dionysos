@@ -44,6 +44,10 @@ struct Cli {
     /// allow yara to scan compressed files
     #[clap(short('C'), long("scan-compressed"))]
     scan_compressed: bool,
+
+    /// maximum size (in MiB) of decompression buffer, which is used to scan compressed files
+    #[clap(long("decompression-buffer"), default_value_t=128)]
+    decompression_buffer_size: usize
 }
 
 pub struct Dionysos {
@@ -51,8 +55,7 @@ pub struct Dionysos {
     loglevel: LevelFilter,
     yara_rules: Option<PathBuf>,
     filenames: Vec<regex::Regex>,
-    omit_levenshtein: bool,
-    scan_compressed: bool,
+    cli: Cli,
 }
 
 async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult {
@@ -84,7 +87,8 @@ impl Dionysos {
 
         if let Some(ref yara_rules) = self.yara_rules {
             let yara_scanner = YaraScanner::new(yara_rules)?
-                .with_scan_compressed(self.scan_compressed);
+                .with_scan_compressed(self.cli.scan_compressed)
+                .with_buffer_size(self.cli.decompression_buffer_size);
             scanners.push(Box::new(yara_scanner));
         };
 
@@ -93,7 +97,7 @@ impl Dionysos {
             scanners.push(Box::new(filename_scanner));
         }
 
-        if !self.omit_levenshtein {
+        if !self.cli.omit_levenshtein {
             let levenshtein_scanner = LevenshteinScanner::default();
             scanners.push(Box::new(levenshtein_scanner));
         }
@@ -154,7 +158,7 @@ impl Dionysos {
     fn parse_options() -> Result<Self> {
         let cli = Cli::parse();
         
-        let path = match cli.path {
+        let path = match &cli.path {
             Some(path) => PathBuf::from(&path),
 
             #[cfg(target_os = "windows")]
@@ -164,7 +168,7 @@ impl Dionysos {
             None => PathBuf::from("/"),
         };
 
-        let yara_rules = match cli.yara {
+        let yara_rules = match &cli.yara {
             None => None,
             Some(p) => {
                 let yara_rules = PathBuf::from(&p);
@@ -186,8 +190,7 @@ impl Dionysos {
             loglevel: cli.verbose.log_level_filter(),
             yara_rules,
             filenames,
-            omit_levenshtein: cli.omit_levenshtein,
-            scan_compressed: cli.scan_compressed
+            cli
         })
     }
 }

@@ -145,6 +145,12 @@ impl YaraScanner {
         self
     }
 
+    #[allow(unused_mut)]
+    pub fn with_buffer_size(mut self, buffer_size: usize) -> Self {
+        self.buffer.replace(Vec::with_capacity(1024*1024*buffer_size));
+        self
+    }
+
     fn add_rules_from_yara<P>(rules: &mut Vec<yara::Rules>, path: P) -> Result<()> where P: AsRef<Path> {
         Self::add_rules_from_stream(rules, &path, &mut BufReader::new(File::open(&path)?))
     }
