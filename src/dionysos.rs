@@ -88,6 +88,9 @@ impl Dionysos {
 
     pub fn run(&self) -> Result<()> {
         self.init_logging()?;
+
+        log::info!("running dionysos version {}", env!("CARGO_PKG_VERSION"));
+
         let mut scanners: Vec<Box<dyn FileScanner>> = Vec::new();
 
         if let Some(ref yara_rules) = self.yara_rules {

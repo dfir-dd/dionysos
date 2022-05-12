@@ -2,6 +2,7 @@ use filemagic::Magic;
 use yara;
 use anyhow::{Result, anyhow};
 use crate::filescanner::*;
+use crate::scanner_result;
 use crate::scanner_result::*;
 use std::cell::RefCell;
 use std::io::Read;
@@ -111,7 +112,12 @@ impl FileScanner for YaraScanner
                     results.push(Err(anyhow!("yara scan error with '{}': {}", file.display(), why)));
                 }
                 Ok(res) => {
-                    results.extend(res.iter().map(|r| Ok(ScannerFinding::Yara(YaraFinding::from(r)))));
+                    results.extend(res.iter().map(|r| {
+                        log::trace!("new yara finding: {} in '{}'",
+                            scanner_result::escape(&r.identifier),
+                            file.display());
+                        Ok(ScannerFinding::Yara(YaraFinding::from(r)))}
+                    ));
                 }
             }
         }

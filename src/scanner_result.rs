@@ -37,7 +37,7 @@ impl From<&Path> for ScannerResult {
     }
 }
 
-fn escape(value: &str) -> String {
+pub fn escape(value: &str) -> String {
     str::replace(value, "\"", "\\\"")
 }
 
