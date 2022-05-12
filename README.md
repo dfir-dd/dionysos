@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.3.1
+dionysos 0.4.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -31,6 +31,9 @@ OPTIONS:
 
     -h, --help
             Print help information
+
+    -L, --log-file <LOG_FILE>
+            path of the file to write logs to. Logs will always be appended
 
         --omit-levenshtein
             do not run the Levenshtein scanner
