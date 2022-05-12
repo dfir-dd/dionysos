@@ -79,22 +79,24 @@ impl FileScanner for YaraScanner
 
         self.buffer.borrow_mut().clear();
 
-        if let Err(why) = match compression_type {
-            CompressionType::GZip => {
-                let mut gz = GzDecoder::new(File::open(file).unwrap());
-                gz.read_to_end(&mut self.buffer.borrow_mut())
-            }
-            CompressionType::BZip2 => {
-                let mut bz = BzDecoder::new(File::open(file).unwrap());
-                bz.read_to_end(&mut self.buffer.borrow_mut())
-            }
-            CompressionType::XZ => {
-                let mut xz = XzDecoder::new(File::open(file).unwrap());
-                xz.read_to_end(&mut self.buffer.borrow_mut())
-            }
+        let decompression_result = match compression_type {
+            CompressionType::GZip => self.read_into_buffer(GzDecoder::new(File::open(file).unwrap())),
+            CompressionType::BZip2 => self.read_into_buffer(BzDecoder::new(File::open(file).unwrap())),
+            CompressionType::XZ => self.read_into_buffer(XzDecoder::new(File::open(file).unwrap())),
             _ => Ok(0)
-        } {
-            return vec![Err(anyhow!(why))];
+        };
+
+        match decompression_result {
+            Ok(0) => (), // no decompression took place
+            Err(why) => return vec![Err(anyhow!(why))],
+            Ok(bytes) => {
+                if bytes == self.buffer.borrow().capacity() {
+                    log::warn!("file '{}' could not be decompressed completely, read {} of possible {} bytes",
+                        file.display(),
+                        bytes,
+                        self.buffer.borrow().capacity())
+                }
+            }
         }
 
         for rules in self.rules.iter() {
@@ -247,6 +249,11 @@ impl YaraScanner {
     fn is_zip_filename(filename: &str) -> bool {
         let lc_filename = filename.to_lowercase();
         lc_filename.ends_with(".zip")
+    }
+
+    fn read_into_buffer<R: Read>(&self, reader: R) -> std::io::Result<usize> {
+        let mut reader_with_limit = BufReader::new(reader.take(self.buffer.borrow().capacity() as u64));
+        reader_with_limit.read_to_end(&mut self.buffer.borrow_mut())
     }
 }
 
