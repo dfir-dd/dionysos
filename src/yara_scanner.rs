@@ -91,10 +91,7 @@ impl FileScanner for YaraScanner
             Err(why) => return vec![Err(anyhow!(why))],
             Ok(bytes) => {
                 if bytes == self.buffer.borrow().capacity() {
-                    log::warn!("file '{}' could not be decompressed completely, read {} of possible {} bytes",
-                        file.display(),
-                        bytes,
-                        self.buffer.borrow().capacity())
+                    log::warn!("file '{}' could not be decompressed completely", file.display())
                 }
             }
         }

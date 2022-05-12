@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
@@ -13,7 +13,7 @@ authors = ["Jan Starke <Jan.Starke@t-systems.com>"]
 anyhow = "1"
 clap = {version="3", features=["derive"]}
 clap-verbosity-flag = {version="1.0.0"}
-simplelog = "0.11"
+simplelog = "0.12"
 log = "0.4"
 walkdir = "2"
 yara = "0.12"

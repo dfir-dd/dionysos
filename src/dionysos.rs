@@ -3,11 +3,12 @@ use clap::Parser;
 use futures::future;
 use futures::executor::block_on;
 use walkdir::WalkDir;
+use std::fs::File;
 use std::path::{PathBuf};
-use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
+use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
 use regex;
 use std::sync::Arc;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerResult};
@@ -47,7 +48,11 @@ struct Cli {
 
     /// maximum size (in MiB) of decompression buffer, which is used to scan compressed files
     #[clap(long("decompression-buffer"), default_value_t=128)]
-    decompression_buffer_size: usize
+    decompression_buffer_size: usize,
+
+    /// path of the file to write logs to. Logs will always be appended
+    #[clap(short('L'), long("log-file"))]
+    log_file: Option<String>
 }
 
 pub struct Dionysos {
@@ -107,6 +112,10 @@ impl Dionysos {
         let mut results = Vec::new();
         let count = WalkDir::new(&self.path).into_iter().count();
         let progress = ProgressBar::new(count as u64);
+        let progress_style = ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")
+                .progress_chars("##-");
+        progress.set_style(progress_style);
         
         let max_workers = 8;
         let mut workers = Vec::new();
@@ -145,14 +154,39 @@ impl Dionysos {
     }
 
     fn init_logging(&self) -> Result<()> {
-        match TermLogger::init(
-            self.loglevel,
-            Config::default(),
-            TerminalMode::Stderr,
-            ColorChoice::Auto) {
-                Err(why) => Err(anyhow!(why)),
-                _ => Ok(()),
+        match &self.cli.log_file {
+            None => match TermLogger::init(
+                self.loglevel,
+                Config::default(),
+                TerminalMode::Stderr,
+                ColorChoice::Auto) {
+                    Err(why) => Err(anyhow!(why)),
+                    _ => Ok(()),
+                },
+            Some(log_file_name) => {
+                let log_file = match File::options().create(true).append(true).open(log_file_name) {
+                    Ok(file) => file,
+                    Err(why) => {
+                        eprintln!("unable to write to log file: '{}'", log_file_name);
+                        return Err(anyhow!(why));
+                    }
+                };
+
+                let config = ConfigBuilder::default()
+                    .set_time_format_rfc3339()
+                    .build();
+
+                match WriteLogger::init(
+                    self.loglevel,
+                    config,
+                    log_file
+                ) {
+                    Err(why) => Err(anyhow!(why)),
+                    _ => Ok(()),
+                }
             }
+        }
+        
     }
 
     fn parse_options() -> Result<Self> {
