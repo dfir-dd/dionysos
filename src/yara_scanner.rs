@@ -56,10 +56,11 @@ impl FileScanner for YaraScanner
         if self.scan_compressed {
             let magic = match self.magic.file(file) {
                 Ok(magic) => {
+                    log::info!("treating '{}' as '{}'", file.display(), &magic);
                     Some(magic)
                 }
                 Err(why) => { 
-                    log::warn!("unable to determin file type for '{}': {}",
+                    log::warn!("unable to determine file type for '{}': {}",
                         file.display(), why);
                     None
                 }
@@ -92,6 +93,9 @@ impl FileScanner for YaraScanner
             Ok(bytes) => {
                 if bytes == self.buffer.borrow().capacity() {
                     log::warn!("file '{}' could not be decompressed completely", file.display())
+                } else {
+                    assert!(! self.buffer.borrow().is_empty());
+                    log::info!("uncompressed {} bytes from '{}'", bytes, file.display());
                 }
             }
         }
@@ -99,7 +103,7 @@ impl FileScanner for YaraScanner
         for rules in self.rules.iter() {
             let scan_result = match self.buffer.borrow().is_empty() {
                 true => rules.scan_file(&file, 120),
-                false => rules.scan_mem(&self.buffer.borrow()[..], 120).or_else(|e| Err(yara::Error::Yara(e))),
+                false => rules.scan_mem(&self.buffer.borrow(), 120).or_else(|e| Err(yara::Error::Yara(e))),
             };
 
             match scan_result {

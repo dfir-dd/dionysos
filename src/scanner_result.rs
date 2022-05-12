@@ -47,13 +47,13 @@ impl fmt::Display for ScannerResult {
         for finding in self.findings.iter() {
             match finding {
                 ScannerFinding::Yara(yara_finding) => {
-                    write!(f, "\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename)?;
+                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename)?;
                 }
                 ScannerFinding::Filename(regex) => {
-                    write!(f, "\"{}\";\"{}\";\"{}\"", "Filename", escape(regex), &filename)?;
+                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Filename", escape(regex), &filename)?;
                 }
                 ScannerFinding::Levenshtein(original) => {
-                    write!(f, "\"{}\";\"{}\";\"{}\"", "Levenshtein", escape(original), &filename)?;
+                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Levenshtein", escape(original), &filename)?;
                 }
             }
         }

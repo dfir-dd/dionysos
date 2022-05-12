@@ -124,6 +124,7 @@ impl Dionysos {
                 .into_iter()
                 .filter_map(|e| e.ok())
                 .filter(|e| e.file_type().is_file()) {
+            log::info!("scanning '{}'", entry.file_name().to_string_lossy());
             while workers.len() >= max_workers {
                 let selector_future = future::select_all(workers);
                 let (result, _, wrkrs) = block_on(selector_future);
@@ -146,7 +147,7 @@ impl Dionysos {
 
         for result in results.iter() {
             if result.has_findings() {
-                println!("{}", result);
+                print!("{}", result);
             }
         }
         
