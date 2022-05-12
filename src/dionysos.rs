@@ -3,7 +3,7 @@ use clap::Parser;
 use futures::future;
 use futures::executor::block_on;
 use walkdir::WalkDir;
-use std::fs::File;
+use std::fs::{OpenOptions};
 use std::path::{PathBuf};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
 use regex;
@@ -165,7 +165,7 @@ impl Dionysos {
                     _ => Ok(()),
                 },
             Some(log_file_name) => {
-                let log_file = match File::options().create(true).append(true).open(log_file_name) {
+                let log_file = match OpenOptions::new().create(true).append(true).open(log_file_name) {
                     Ok(file) => file,
                     Err(why) => {
                         eprintln!("unable to write to log file: '{}'", log_file_name);
