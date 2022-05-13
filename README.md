@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.4.3
+dionysos 0.5.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -31,6 +31,9 @@ OPTIONS:
 
     -h, --help
             Print help information
+
+    -H, --file-hash <FILE_HASH>
+            Hash of file to match against. Use any of MD5, SHA1 or SHA256
 
     -L, --log-file <LOG_FILE>
             path of the file to write logs to. Logs will always be appended
@@ -71,7 +74,7 @@ Take, for example, the `FilenameScanner`, which tries to do a simple filename ma
 ```rust
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding};
-use std::path::Path;
+use walkdir::DirEntry;
 
 pub struct FilenameScanner {
     patterns: Vec<regex::Regex>,
@@ -87,8 +90,8 @@ impl FilenameScanner {
 
 impl FileScanner for FilenameScanner
 {
-    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
-        let filename = file.to_str().unwrap();
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
+        let filename = file.path().to_str().unwrap();
         self.patterns
             .iter()
             .filter(|p|p.is_match(&filename))
