@@ -15,6 +15,7 @@ use crate::scanner_result::{ScannerResult};
 use crate::yara_scanner::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
+use crate::hash_scanner::HashScanner;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -52,7 +53,11 @@ struct Cli {
 
     /// path of the file to write logs to. Logs will always be appended
     #[clap(short('L'), long("log-file"))]
-    log_file: Option<String>
+    log_file: Option<String>,
+
+    /// Hash of file to match against. Use any of MD5, SHA1 or SHA256
+    #[clap(short('H'), long("file-hash"))]
+    file_hash: Vec<String>,
 }
 
 pub struct Dionysos {
@@ -66,7 +71,7 @@ pub struct Dionysos {
 async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult {
     let mut result = ScannerResult::from(entry.path());
     for scanner in scanners.iter() {
-        for res in scanner.scan_file(entry.path()).into_iter() {
+        for res in scanner.scan_file(&entry).into_iter() {
             match res {
                 Err(why) => {
                     log::error!("{}", why);
@@ -108,6 +113,12 @@ impl Dionysos {
         if !self.cli.omit_levenshtein {
             let levenshtein_scanner = LevenshteinScanner::default();
             scanners.push(Box::new(levenshtein_scanner));
+        }
+
+        if !self.cli.file_hash.is_empty() {
+            let hash_scanner = HashScanner::default()
+                .with_hashes(&self.cli.file_hash)?;
+            scanners.push(Box::new(hash_scanner));
         }
 
         let scanners = Arc::new(scanners);

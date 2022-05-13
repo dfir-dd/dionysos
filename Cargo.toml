@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "0.4.3"
+version = "0.5.0"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
@@ -26,3 +26,10 @@ filemagic = "0"
 flate2 = "1"
 bzip2 = "0.4"
 xz = "0.1"
+
+hex = "0.4"
+
+memmap = "0.7"
+md-5 = "0.10"
+sha-1 = "0.10"
+sha2 = "0.10"

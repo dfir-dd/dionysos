@@ -1,4 +1,5 @@
 use std::path::{PathBuf, Path};
+use crate::hash_scanner::CryptoHash;
 use crate::yara_scanner::YaraFinding;
 use std::fmt;
 use std::str;
@@ -7,6 +8,7 @@ pub enum ScannerFinding {
     Yara(YaraFinding),
     Filename(String),
     Levenshtein(String),
+    Hash(CryptoHash)
 }
 
 pub struct ScannerResult {
@@ -45,7 +47,7 @@ impl fmt::Display for ScannerResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let filename = escape(self.filename());
         for finding in self.findings.iter() {
-            match finding {
+            match &finding {
                 ScannerFinding::Yara(yara_finding) => {
                     writeln!(f, "\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename)?;
                 }
@@ -54,6 +56,9 @@ impl fmt::Display for ScannerResult {
                 }
                 ScannerFinding::Levenshtein(original) => {
                     writeln!(f, "\"{}\";\"{}\";\"{}\"", "Levenshtein", escape(original), &filename)?;
+                }
+                &ScannerFinding::Hash(hash) => {
+                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Hash", hash, &filename)?;
                 }
             }
         }

@@ -1,8 +1,9 @@
+use walkdir::DirEntry;
+
 use crate::scanner_result::*;
-use std::path::Path;
 
 pub trait FileScanner
 {
-    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> ;
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> ;
 }
 

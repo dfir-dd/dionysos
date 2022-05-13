@@ -1,4 +1,5 @@
 use filemagic::Magic;
+use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
 use crate::filescanner::*;
@@ -49,8 +50,9 @@ enum CompressionType {
 
 impl FileScanner for YaraScanner
 {
-    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
         let mut results = Vec::new();
+        let file = file.path();
 
         // check if the file is a compressed file
         let compression_type = 

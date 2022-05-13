@@ -1,3 +1,5 @@
+use walkdir::DirEntry;
+
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding};
 use std::path::Path;
@@ -25,7 +27,13 @@ impl Default for LevenshteinScanner {
 }
 
 impl FileScanner for LevenshteinScanner {
-    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
+        self.intern_scan_file(file.path())
+    }
+}
+
+impl LevenshteinScanner {
+    fn intern_scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {        
         match file.file_name() {
             None => vec![],
             Some(file_name) => match file_name.to_str() {
@@ -133,7 +141,6 @@ pub fn has_levenshtein_distance_one(a: &Vec<char>, b: &Vec<char>) -> bool {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use crate::filescanner::*;
     use super::LevenshteinScanner;
 
     #[test]
@@ -141,7 +148,7 @@ mod tests {
         let scanner = LevenshteinScanner::default();
         let filename = env!("CARGO_MANIFEST_DIR").to_owned() + "/explorer.exe";
         let sample = PathBuf::from(&filename);
-        let results = scanner.scan_file(&sample);
+        let results = scanner.intern_scan_file(&sample);
         assert!(results.is_empty(), "invalid result for {}", filename);
     }
 
@@ -156,7 +163,7 @@ mod tests {
         for sample_fn in samples {
             let filename = env!("CARGO_MANIFEST_DIR").to_owned() + sample_fn;
             let sample = PathBuf::from(&filename);
-            let results = scanner.scan_file(&sample);
+            let results = scanner.intern_scan_file(&sample);
             match results.last() {
                 None => assert!(results.is_empty(), "invalid result for {}", filename),
                 Some(result) => match result {
@@ -179,7 +186,7 @@ mod tests {
         for sample_fn in samples {
             let filename = env!("CARGO_MANIFEST_DIR").to_owned() + sample_fn;
             let sample = PathBuf::from(&filename);
-            let results = scanner.scan_file(&sample);
+            let results = scanner.intern_scan_file(&sample);
             assert!(results.is_empty(), "invalid result for {}", filename);
         }
     }

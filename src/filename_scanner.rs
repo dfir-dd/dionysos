@@ -1,6 +1,7 @@
+use walkdir::DirEntry;
+
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding};
-use std::path::Path;
 
 pub struct FilenameScanner {
     patterns: Vec<regex::Regex>,
@@ -16,7 +17,8 @@ impl FilenameScanner {
 
 impl FileScanner for FilenameScanner
 {
-    fn scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
+        let file = file.path();
         let filename = file.to_str().unwrap();
         self.patterns
             .iter()

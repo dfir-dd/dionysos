@@ -6,6 +6,7 @@ mod yara_scanner;
 mod filename_scanner;
 mod scanner_result;
 mod levenshtein_scanner;
+mod hash_scanner;
 use dionysos::*;
 
 fn main() -> Result <()> {
