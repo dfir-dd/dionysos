@@ -16,12 +16,14 @@ clap-verbosity-flag = {version="1.0.0"}
 simplelog = "0.12"
 log = "0.4"
 walkdir = "2"
-yara = "0.12"
+yara = "0"
 zip = "0.5"
 regex = "1.5"
 indicatif = "0.16"
 futures = {version="0.3", features=["executor", "thread-pool"]}
 filemagic = "0"
+duplicate = "0.4"
+file-owner = "0.1"
 
 flate2 = "1"
 bzip2 = "0.4"
