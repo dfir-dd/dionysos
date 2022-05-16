@@ -89,8 +89,7 @@ impl YaraExternals {
 }
 
 pub struct YaraScanner {
-    rules: Vec<yara::Rules>,
-    rules_with_externals: Vec<String>,
+    rules: yara::Rules,
     scan_compressed: bool,
     magic: Magic,
     buffer: RefCell<Vec<u8>>
@@ -181,46 +180,34 @@ impl FileScanner for YaraScanner
             }
         }
 
-        let mut compiler = match yara::Compiler::new() {
+        let mut scanner = match self.rules.scanner() {
             Err(why) => return vec![Err(anyhow!(why))],
-            Ok(mut compiler) => {
-                for entry in externals.to_hashmap() {
-                    compiler.define_variable(entry.0, entry.1).unwrap();
-                }
-                compiler
+            Ok(scanner) => scanner
+        };
+        scanner.set_timeout(120);
+
+        for entry in externals.to_hashmap() {
+            if let Err(why) = scanner.define_variable(entry.0, entry.1) {
+                return vec![Err(anyhow!(why))];
             }
-        };
-        for rule_str in &self.rules_with_externals {
-            compiler = 
-            match compiler.add_rules_str(&rule_str) {
-                Ok(compiler) => compiler,
-                Err(why) => return vec![Err(anyhow!(why))],
-            };
         }
-        let additional_rules = match compiler.compile_rules() {
-            Ok(rules) => rules,
-            Err(why) => return vec![Err(anyhow!(why))]
+
+        let scan_result = match self.buffer.borrow().is_empty() {
+            true => scanner.scan_file(&file),
+            false => scanner.scan_mem(&self.buffer.borrow()).or_else(|e| Err(yara::Error::Yara(e))),
         };
 
-        for rules in self.rules.iter().chain(
-            vec![additional_rules].iter()) {
-            let scan_result = match self.buffer.borrow().is_empty() {
-                true => rules.scan_file(&file, 120),
-                false => rules.scan_mem(&self.buffer.borrow(), 120).or_else(|e| Err(yara::Error::Yara(e))),
-            };
-
-            match scan_result {
-                Err(why) => {
-                    results.push(Err(anyhow!("yara scan error with '{}': {}", file.display(), why)));
-                }
-                Ok(res) => {
-                    results.extend(res.iter().map(|r| {
-                        log::trace!("new yara finding: {} in '{}'",
-                            scanner_result::escape(&r.identifier),
-                            file.display());
-                        Ok(ScannerFinding::Yara(YaraFinding::from(r)))}
-                    ));
-                }
+        match scan_result {
+            Err(why) => {
+                results.push(Err(anyhow!("yara scan error with '{}': {}", file.display(), why)));
+            }
+            Ok(res) => {
+                results.extend(res.iter().map(|r| {
+                    log::trace!("new yara finding: {} in '{}'",
+                        scanner_result::escape(&r.identifier),
+                        file.display());
+                    Ok(ScannerFinding::Yara(YaraFinding::from(r)))}
+                ));
             }
         }
         results
@@ -229,27 +216,30 @@ impl FileScanner for YaraScanner
 
 impl YaraScanner {
     pub fn new<P>(path: P) -> Result<Self> where P: AsRef<Path> {
-        let mut rules = Vec::new();
-        let mut rules_with_externals = Vec::new();
+        let mut rules_str = Vec::new();
         let metadata = std::fs::metadata(&path)?;
         if metadata.is_file() {
             if Self::points_to_zip_file(&path)? {
-                Self::add_rules_from_zip(&mut rules, &mut rules_with_externals, &path)?;
+                Self::add_rules_from_zip(&mut rules_str, &path)?;
             } else if Self::points_to_yara_file(&path)? {
-                Self::add_rules_from_yara(&mut rules, &mut rules_with_externals, path)?;
+                Self::add_rules_from_yara(&mut rules_str, path)?;
             } else {
                 log::warn!("file '{}' is neither a yara nor a zip file; I'll ignore it", path.as_ref().display());
             }
         } else {
-            Self::add_rules_from_directory(&mut rules, &mut rules_with_externals, path)?;
+            Self::add_rules_from_directory(&mut rules_str, path)?;
         }
 
-        log::info!("YaraScanner has compiled {} rulesets which don't need external data", rules.len());
-        log::info!("YaraScanner has stored {} rulesets which require external data", rules_with_externals.len());
+        let mut compiler = yara::Compiler::new()?;
+        for entry in YaraExternals::dummy().to_hashmap() {
+            compiler.define_variable(entry.0, entry.1)?;
+        }
+        for rule in rules_str.into_iter() {
+            compiler = compiler.add_rules_str(&rule)?;
+        }
 
         Ok(Self {
-            rules: rules,
-            rules_with_externals: rules_with_externals,
+            rules: compiler.compile_rules()?,
             scan_compressed: false,
             magic: magic!().unwrap(),
             buffer: RefCell::new(Vec::with_capacity(1024*1024*128))
@@ -267,65 +257,25 @@ impl YaraScanner {
     }
 
     fn add_rules_from_yara<P>(
-        rules: &mut Vec<yara::Rules>, 
-        rules_with_externals: &mut Vec<String>, 
+        rules: &mut Vec<String>,
         path: P) -> Result<()> where P: AsRef<Path> {
-        Self::add_rules_from_stream(rules, rules_with_externals, &path, &mut BufReader::new(File::open(&path)?))
+        Self::add_rules_from_stream(rules, &path, &mut BufReader::new(File::open(&path)?))
     }
 
     fn add_rules_from_stream<P, R>(
-            my_rules: &mut Vec<yara::Rules>,
-            rules_with_externals: &mut Vec<String>,  
+            rules: &mut Vec<String>,
             path: P, stream: &mut R) -> Result<()> where P: AsRef<Path>, R: std::io::Read {
         log::trace!("parsing yara file: '{}'", path.as_ref().display());
         let mut yara_content = String::new();
         stream.read_to_string(&mut yara_content)?;
-
-        // FIXME: currently, we use a new compiler for every rules,
-        // because of https://github.com/Hugal31/yara-rust/issues/47
-        match yara::Compiler::new()?.add_rules_str(&yara_content) {
-            Ok(compiler) => {
-                match compiler.compile_rules() {
-                    Ok(rules) => {
-                        my_rules.push(rules);
-                    }
-                    Err(why) => {
-                        log::warn!("yara: compiler error in '{}'", path.as_ref().display());
-                        log::warn!("message was: '{}'", why);
-                    }
-                }
-            }
-            Err(why) => {
-                if Self::rule_can_compiled_with_externals(&yara_content, &YaraExternals::dummy()) {
-                    rules_with_externals.push(yara_content);
-                } else {
-                    log::warn!("yara: unable to load content from '{}'", path.as_ref().display());
-                    log::warn!("message was: '{}'", why);
-                }
-            }
-        }
+        
+        rules.push(yara_content);
         
         Ok(())
     }
 
-    fn rule_can_compiled_with_externals(yara_content: &str, externals: &YaraExternals) -> bool {
-        match yara::Compiler::new() {
-            Err(_) => false,
-            Ok(mut compiler) => {
-                for ext in externals.to_hashmap() {
-                    if compiler.define_variable(ext.0, ext.1).is_err() {return false;}
-                }
-                match compiler.add_rules_str(yara_content) {
-                    Ok(compiler) => compiler.compile_rules().is_ok(),
-                    _ => false
-                }
-            }
-        }
-    }
-
     fn add_rules_from_zip<P>(
-        rules: &mut Vec<yara::Rules>, 
-        rules_with_externals: &mut Vec<String>, 
+        rules: &mut Vec<String>,
         path: P) -> Result<()> where P: AsRef<Path> {
 
         let zip_file = BufReader::new(File::open(&path)?);
@@ -339,7 +289,7 @@ impl YaraScanner {
                             if Self::is_yara_filename(name) {
                                 // create PathBuf to let rust release all immutable borrows of `file`
                                 let file_path = file_path.to_path_buf();
-                                Self::add_rules_from_stream(rules, rules_with_externals, file_path.to_path_buf(), &mut file)?;
+                                Self::add_rules_from_stream(rules, file_path.to_path_buf(), &mut file)?;
                             }
                         }
                         None => {
@@ -356,13 +306,12 @@ impl YaraScanner {
     }
     
     fn add_rules_from_directory<P>(
-        rules: &mut Vec<yara::Rules>, 
-        rules_with_externals: &mut Vec<String>,
+        rules: &mut Vec<String>,
         path: P) -> Result<()> where P: AsRef<Path> {
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if Self::points_to_yara_file(&path)? {
-                Self::add_rules_from_yara(rules, rules_with_externals, path)?;
+                Self::add_rules_from_yara(rules, path)?;
             }
         }
         Ok(())
