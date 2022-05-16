@@ -315,7 +315,10 @@ impl YaraScanner {
                 for ext in externals.to_hashmap() {
                     if compiler.define_variable(ext.0, ext.1).is_err() {return false;}
                 }
-                compiler.add_rules_str(yara_content).is_ok()
+                match compiler.add_rules_str(yara_content) {
+                    Ok(compiler) => compiler.compile_rules().is_ok(),
+                    _ => false
+                }
             }
         }
     }
