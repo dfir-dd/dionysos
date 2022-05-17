@@ -142,7 +142,10 @@ impl FileScanner for YaraScanner
             externals.with_owner(match file.display().to_string().owner(){
                 Ok(owner) => match owner.name() {
                     Ok(name) => name.or(Some(owner.id().to_string())).unwrap(),
-                    Err(why) => return vec![Err(anyhow!("unable to retrieve owner name: {:?}", why))]
+                    Err(why) => {
+                        log::warn!("unable to retrieve owner name: {:?}", why);
+                        owner.id().to_string()
+                    }
                 }
                 Err(why) => return vec![Err(anyhow!("unable to determine file owner: {:?}", why))]
             })
