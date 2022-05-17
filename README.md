@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.5.0
+dionysos 0.6.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -57,6 +57,9 @@ OPTIONS:
             use yara scanner with the specified ruleset. This can be a single file, a zip file or a
             directory containing lots of yara files. Yara files must end with 'yar' or 'yara', and
             zip files must end with 'zip'
+
+        --yara-timeout <YARA_TIMEOUT>
+            timeout for the yara scanner, in seconds [default: 240]
 ```
 
 # Developer guide
