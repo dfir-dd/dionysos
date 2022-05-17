@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
