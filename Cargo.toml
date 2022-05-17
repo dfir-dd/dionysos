@@ -1,16 +1,19 @@
 [package]
 name = "dionysos"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
+repository = "https://www.github.com/janstarke/dionysos"
 license = "GPL-3.0"
 authors = ["Jan Starke <Jan.Starke@t-systems.com>"]
+categories = ["command-line-utilities", "filesystem"]
+keywords = ["cli", "forensics", "security"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1"
+anyhow = "1.0"
 clap = {version="3", features=["derive"]}
 clap-verbosity-flag = {version="1.0.0"}
 simplelog = "0.12"
