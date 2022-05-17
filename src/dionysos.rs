@@ -78,6 +78,7 @@ async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::D
                 }
 
                 Ok(res) => {
+                    log::trace!("new finding from {} for {}", scanner, entry.path().display());
                     result.add_finding(res);
                 }
             }

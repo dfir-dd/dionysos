@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
@@ -12,6 +14,12 @@ impl FilenameScanner {
         Self {   
             patterns,
         }
+    }
+}
+
+impl Display for FilenameScanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "FilenameScanner")
     }
 }
 

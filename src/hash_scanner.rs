@@ -124,6 +124,13 @@ impl HashScanner {
     }
 }
 
+impl Display for HashScanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "HashScanner")
+    }
+}
+
+
 impl FileScanner for HashScanner {
     fn scan_file(&self, entry: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
         const EMPTY_SLICE: [u8; 0] = [];

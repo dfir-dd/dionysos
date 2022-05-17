@@ -2,6 +2,7 @@ use walkdir::DirEntry;
 
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding};
+use std::fmt::Display;
 use std::path::Path;
 pub struct LevenshteinScanner {
     wellknown_files: Vec<Vec<char>>
@@ -29,6 +30,12 @@ impl Default for LevenshteinScanner {
 impl FileScanner for LevenshteinScanner {
     fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
         self.intern_scan_file(file.path())
+    }
+}
+
+impl Display for LevenshteinScanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "LevenshteinScanner")
     }
 }
 

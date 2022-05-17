@@ -1,8 +1,8 @@
+use std::fmt::Display;
 use walkdir::DirEntry;
-
 use crate::scanner_result::*;
 
-pub trait FileScanner
+pub trait FileScanner: Display
 {
     fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>>;
 }

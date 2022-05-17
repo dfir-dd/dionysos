@@ -8,6 +8,7 @@ use crate::scanner_result;
 use crate::scanner_result::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io::Read;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -102,6 +103,13 @@ enum CompressionType {
     Uncompressed
 }
 
+
+impl Display for YaraScanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "YaraScanner")
+    }
+}
+
 impl FileScanner for YaraScanner
 {
     fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
@@ -134,9 +142,9 @@ impl FileScanner for YaraScanner
             externals.with_owner(match file.display().to_string().owner(){
                 Ok(owner) => match owner.name() {
                     Ok(name) => name.or(Some(owner.id().to_string())).unwrap(),
-                    Err(why) => return vec![Err(anyhow!(why))]
+                    Err(why) => return vec![Err(anyhow!("unable to retrieve owner name: {:?}", why))]
                 }
-                Err(why) => return vec![Err(anyhow!(why))]
+                Err(why) => return vec![Err(anyhow!("unable to determine file owner: {:?}", why))]
             })
         } else {
             externals.with_owner("-".to_owned())
@@ -169,7 +177,7 @@ impl FileScanner for YaraScanner
 
         match decompression_result {
             Ok(0) => (), // no decompression took place
-            Err(why) => return vec![Err(anyhow!(why))],
+            Err(why) => return vec![Err(anyhow!("error while decompressing a file: {:?}", why))],
             Ok(bytes) => {
                 if bytes == self.buffer.borrow().capacity() {
                     log::warn!("file '{}' could not be decompressed completely", file.display())
@@ -181,14 +189,14 @@ impl FileScanner for YaraScanner
         }
 
         let mut scanner = match self.rules.scanner() {
-            Err(why) => return vec![Err(anyhow!(why))],
+            Err(why) => return vec![Err(anyhow!("unable to create yara scanner: {:?}", why))],
             Ok(scanner) => scanner
         };
         scanner.set_timeout(120);
 
         for entry in externals.to_hashmap() {
             if let Err(why) = scanner.define_variable(entry.0, entry.1) {
-                return vec![Err(anyhow!(why))];
+                return vec![Err(anyhow!("unable to define external yara variable '{}': {:?}", entry.0, why))];
             }
         }
 
