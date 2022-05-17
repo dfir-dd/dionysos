@@ -58,6 +58,10 @@ struct Cli {
     /// Hash of file to match against. Use any of MD5, SHA1 or SHA256
     #[clap(short('H'), long("file-hash"))]
     file_hash: Vec<String>,
+
+    /// timeout for the yara scanner, in seconds
+    #[clap(long("yara-timeout"), default_value_t=240)]
+    yara_timeout: u16
 }
 
 pub struct Dionysos {
@@ -102,7 +106,8 @@ impl Dionysos {
         if let Some(ref yara_rules) = self.yara_rules {
             let yara_scanner = YaraScanner::new(yara_rules)?
                 .with_scan_compressed(self.cli.scan_compressed)
-                .with_buffer_size(self.cli.decompression_buffer_size);
+                .with_buffer_size(self.cli.decompression_buffer_size)
+                .with_timeout(self.cli.yara_timeout);
             scanners.push(Box::new(yara_scanner));
         };
 

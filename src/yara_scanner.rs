@@ -93,7 +93,8 @@ pub struct YaraScanner {
     rules: yara::Rules,
     scan_compressed: bool,
     magic: Magic,
-    buffer: RefCell<Vec<u8>>
+    buffer: RefCell<Vec<u8>>,
+    timeout: u16
 }
 
 enum CompressionType {
@@ -195,7 +196,7 @@ impl FileScanner for YaraScanner
             Err(why) => return vec![Err(anyhow!("unable to create yara scanner: {:?}", why))],
             Ok(scanner) => scanner
         };
-        scanner.set_timeout(120);
+        scanner.set_timeout(self.timeout.into());
 
         for entry in externals.to_hashmap() {
             if let Err(why) = scanner.define_variable(entry.0, entry.1) {
@@ -253,7 +254,8 @@ impl YaraScanner {
             rules: compiler.compile_rules()?,
             scan_compressed: false,
             magic: magic!().unwrap(),
-            buffer: RefCell::new(Vec::with_capacity(1024*1024*128))
+            buffer: RefCell::new(Vec::with_capacity(1024*1024*128)),
+            timeout: 240
         })
     }
 
@@ -264,6 +266,11 @@ impl YaraScanner {
 
     pub fn with_buffer_size(self, buffer_size: usize) -> Self {
         self.buffer.replace(Vec::with_capacity(1024*1024*buffer_size));
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: u16) -> Self {
+        self.timeout = timeout;
         self
     }
 
