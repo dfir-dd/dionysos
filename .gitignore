@@ -17,3 +17,4 @@ Cargo.lock
 **/*.zip
 **/*.log
 test/data/large.*
+log/*
