@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.6.1
+dionysos 0.7.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -46,6 +46,9 @@ OPTIONS:
 
     -q, --quiet
             Less output per occurrence
+
+    -s, --print-strings
+            print matching strings (only used by yara currently)
 
     -v, --verbose
             More output per occurrence
@@ -111,9 +114,9 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 # Feature ideas
 
 - [x] use yara rules,
-- [ ] including modules (e.g. import "hash")
+- [x] including variables (e.g. import "hash")
 - [x] use lists of regular expressions for filesystem searches
-- [ ] write results to console / log
+- [x] write results to console / log
 - [x] output must use an easy-to-parse format, while optionally staying human readable to best effort
 - [ ] highly optional: use the same list to search MFT & UsnJrnl in case files were deleted
 - [x] usage via console, cmd args
@@ -121,6 +124,6 @@ Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dio
 - [x] configuration of log level via command line
 - [x] levensthein-scanner
 - [x] use of one parameter to pass yara rules, which might be a file, a zip container or a directory
-- [ ] Scan Windows Registry files
+- [ ] Scan Windows Registry files -> idea: use nt_hive2
 - [ ] Scan Windows Event Logs
 - [x] Scan compressed files

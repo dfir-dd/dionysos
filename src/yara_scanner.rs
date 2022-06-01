@@ -1,17 +1,17 @@
 use duplicate::duplicate_item;
-use filemagic::Magic;
 use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
+use yara::Match;
+use yara::YrString;
 use crate::filescanner::*;
 use crate::scanner_result;
 use crate::scanner_result::*;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
+use std::time::Instant;
 use walkdir::WalkDir;
 use std::fs::File;
 use std::io::BufReader;
@@ -23,20 +23,36 @@ use bzip2::read::BzDecoder;
 #[cfg(target_family="unix")]
 use file_owner::PathExt;
 
+
+pub struct YaraString {
+    pub identifier: String,
+    pub matches: Vec<Match>,
+}
+
+impl From<YrString<'_>> for YaraString {
+    fn from(s: YrString<'_>) -> Self {
+        Self {
+            identifier: s.identifier.to_owned(),
+            matches: s.matches
+        }
+    }
+}
+
 pub struct YaraFinding {
     pub identifier: String,
     pub namespace: String,
     //pub metadatas: Vec<Metadata<'r>>,
     pub tags: Vec<String>,
-    //pub strings: Vec<String>,
+    pub strings: Vec<YaraString>,
 }
 
-impl From<&yara::Rule<'_>> for YaraFinding {
-    fn from(rule: &yara::Rule) -> Self {
+impl From<yara::Rule<'_>> for YaraFinding {
+    fn from(rule: yara::Rule) -> Self {
         Self {
             identifier: rule.identifier.to_owned(),
             namespace: rule.namespace.to_owned(),
             tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
+            strings: rule.strings.into_iter().map(|s| s.into()).collect()
         }
     }
 }
@@ -97,6 +113,7 @@ pub struct YaraScanner {
     buffer_size: usize,
 }
 
+#[derive(Debug)]
 enum CompressionType {
     GZip,
     BZip2,
@@ -167,6 +184,11 @@ impl FileScanner for YaraScanner
                 CompressionType::Uncompressed
             }
         } else {
+            if let Some(m) = &magic {
+                if m.contains("compressed data") {
+                    log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
+                }
+            }
             CompressionType::Uncompressed
         };
 
@@ -213,7 +235,7 @@ impl FileScanner for YaraScanner
                 results.push(Err(anyhow!("yara scan error with '{}': {}", file.display(), why)));
             }
             Ok(res) => {
-                results.extend(res.iter().map(|r| {
+                results.extend(res.into_iter().map(|r| {
                     log::trace!("new yara finding: {} in '{}'",
                         scanner_result::escape(&r.identifier),
                         file.display());
@@ -362,10 +384,23 @@ impl YaraScanner {
     }
 
     fn read_into_buffer<R: Read>(&self, reader: R) -> std::io::Result<(usize, Vec<u8>)> {
+        log::trace!("decompressing file");
+        let begin = Instant::now();
         let mut buffer = Vec::with_capacity(1024*1024*self.buffer_size);
+
         let mut reader_with_limit = BufReader::new(reader.take(buffer.capacity() as u64));
-        reader_with_limit.read_to_end(&mut buffer)
-            .and_then(|b| Ok((b, buffer)))
+        
+        let res = reader_with_limit.read_to_end(&mut buffer);
+        match res {
+            Ok(bytes) => {
+                log::trace!("decompression of {} bytes done in {}s", bytes, Instant::now().duration_since(begin).as_secs_f64());
+                Ok((bytes, buffer))
+            }
+            Err(why) => {
+                log::trace!("decompression failed: {}", why);
+                Err(why)
+            },
+        }
     }
 }
 

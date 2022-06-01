@@ -4,6 +4,7 @@ use walkdir::WalkDir;
 use std::fs::{OpenOptions};
 use std::path::{PathBuf};
 use std::{thread};
+use std::time::Instant;
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
 use regex;
 use std::sync::{Arc, mpsc};
@@ -18,7 +19,7 @@ use crate::hash_scanner::HashScanner;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
-struct Cli {
+pub (crate) struct Cli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
     
@@ -60,7 +61,11 @@ struct Cli {
 
     /// timeout for the yara scanner, in seconds
     #[clap(long("yara-timeout"), default_value_t=240)]
-    yara_timeout: u16
+    yara_timeout: u16,
+
+    /// print matching strings (only used by yara currently)
+    #[clap(short('s'), long("print-strings"))]
+    pub (crate) print_strings: bool
 }
 
 pub struct Dionysos {
@@ -74,6 +79,9 @@ pub struct Dionysos {
 fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEntry) -> ScannerResult {
     let mut result = ScannerResult::from(entry.path());
     for scanner in scanners.iter() {
+        log::trace!("starting {} on {}", scanner, entry.file_name().to_string_lossy());
+        let begin = Instant::now();
+
         for res in scanner.scan_file(&entry).into_iter() {
             match res {
                 Err(why) => {
@@ -86,6 +94,8 @@ fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEn
                 }
             }
         }
+
+        log::trace!("finished {} on {} in {}s", scanner, entry.file_name().to_string_lossy(), Instant::now().duration_since(begin).as_secs_f64());
     }
     result
 }
@@ -201,7 +211,7 @@ impl Dionysos {
                 }
                 Ok(result) => {
                     if result.has_findings() {
-                        print!("{}", result);
+                        print!("{}", result.display(&self.cli));
                     }
                 }
             }
