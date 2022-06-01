@@ -1,4 +1,5 @@
 use std::path::{PathBuf, Path};
+use crate::dionysos::Cli;
 use crate::hash_scanner::CryptoHash;
 use crate::yara_scanner::YaraFinding;
 use std::fmt;
@@ -28,6 +29,37 @@ impl ScannerResult {
     pub fn has_findings(&self) -> bool {
         ! self.findings.is_empty()
     }
+
+    pub (crate) fn display(&self, cli: &Cli) -> String {
+        let mut lines = Vec::new();
+        let filename = escape(self.filename());
+        for finding in self.findings.iter() {
+            match &finding {
+                ScannerFinding::Yara(yara_finding) => {
+                    let headline = format!("\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename);
+                    if cli.print_strings {
+                        for s in yara_finding.strings.iter() {
+                            for m in s.matches.iter() {
+                                lines.push(format!("{};\"{} at offset {:x}: {}\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data)));
+                            }
+                        }
+                    } else {
+                        lines.push(format!("{};\"\"", headline));
+                    }
+                }
+                ScannerFinding::Filename(regex) => {
+                    lines.push(format!("\"{}\";\"{}\";\"{}\";\"\"", "Filename", escape(regex), &filename));
+                }
+                ScannerFinding::Levenshtein(original) => {
+                    lines.push(format!("\"{}\";\"{}\";\"{}\";\"\"", "Levenshtein", escape(original), &filename));
+                }
+                &ScannerFinding::Hash(hash) => {
+                    lines.push(format!("\"{}\";\"{}\";\"{}\";\"\"", "Hash", hash, &filename));
+                }
+            }
+        }
+        lines.join("\n") + "\n"
+    }
 }
 
 impl From<&Path> for ScannerResult {
@@ -41,6 +73,15 @@ impl From<&Path> for ScannerResult {
 
 pub fn escape(value: &str) -> String {
     str::replace(value, "\"", "\\\"")
+}
+
+pub fn escape_vec(v: &Vec<u8>) -> String {
+    v.iter()
+    .map(|b| {let c = char::from(*b); if c.is_ascii_graphic() {
+        c.to_string() } else {
+            format!("\\{:02x}", b)
+        }
+    }).collect::<Vec<String>>().join("")
 }
 
 impl fmt::Display for ScannerResult {

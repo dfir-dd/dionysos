@@ -20,7 +20,7 @@ use crate::hash_scanner::HashScanner;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
-struct Cli {
+pub (crate) struct Cli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
     
@@ -62,7 +62,11 @@ struct Cli {
 
     /// timeout for the yara scanner, in seconds
     #[clap(long("yara-timeout"), default_value_t=240)]
-    yara_timeout: u16
+    yara_timeout: u16,
+
+    /// print matching strings
+    #[clap(short('s'), long("print-strings"))]
+    pub (crate) print_strings: bool
 }
 
 pub struct Dionysos {
@@ -174,7 +178,7 @@ impl Dionysos {
 
         for result in results.iter() {
             if result.has_findings() {
-                print!("{}", result);
+                print!("{}", result.display(&self.cli));
             }
         }
         

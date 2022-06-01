@@ -3,6 +3,8 @@ use filemagic::Magic;
 use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
+use yara::Match;
+use yara::YrString;
 use crate::filescanner::*;
 use crate::scanner_result;
 use crate::scanner_result::*;
@@ -23,20 +25,36 @@ use bzip2::read::BzDecoder;
 #[cfg(target_family="unix")]
 use file_owner::PathExt;
 
+
+pub struct YaraString {
+    pub identifier: String,
+    pub matches: Vec<Match>,
+}
+
+impl From<YrString<'_>> for YaraString {
+    fn from(s: YrString<'_>) -> Self {
+        Self {
+            identifier: s.identifier.to_owned(),
+            matches: s.matches
+        }
+    }
+}
+
 pub struct YaraFinding {
     pub identifier: String,
     pub namespace: String,
     //pub metadatas: Vec<Metadata<'r>>,
     pub tags: Vec<String>,
-    //pub strings: Vec<String>,
+    pub strings: Vec<YaraString>,
 }
 
-impl From<&yara::Rule<'_>> for YaraFinding {
-    fn from(rule: &yara::Rule) -> Self {
+impl From<yara::Rule<'_>> for YaraFinding {
+    fn from(rule: yara::Rule) -> Self {
         Self {
             identifier: rule.identifier.to_owned(),
             namespace: rule.namespace.to_owned(),
             tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
+            strings: rule.strings.into_iter().map(|s| s.into()).collect()
         }
     }
 }
@@ -221,7 +239,7 @@ impl FileScanner for YaraScanner
                 results.push(Err(anyhow!("yara scan error with '{}': {}", file.display(), why)));
             }
             Ok(res) => {
-                results.extend(res.iter().map(|r| {
+                results.extend(res.into_iter().map(|r| {
                     log::trace!("new yara finding: {} in '{}'",
                         scanner_result::escape(&r.identifier),
                         file.display());
