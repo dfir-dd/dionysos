@@ -64,7 +64,7 @@ pub (crate) struct Cli {
     #[clap(long("yara-timeout"), default_value_t=240)]
     yara_timeout: u16,
 
-    /// print matching strings
+    /// print matching strings (only used by yara currently)
     #[clap(short('s'), long("print-strings"))]
     pub (crate) print_strings: bool
 }
