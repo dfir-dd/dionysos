@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.7.0
+dionysos 0.8.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -22,8 +22,8 @@ OPTIONS:
             allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
 
         --decompression-buffer <DECOMPRESSION_BUFFER_SIZE>
-            maximum size (in MiB) of decompression buffer, which is used to scan compressed files
-            [default: 128]
+            maximum size (in MiB) of decompression buffer (per thread), which is used to scan
+            compressed files [default: 128]
 
     -F, --filename <FILENAMES>
             regular expression to match against the basename of files. This parameter can be
@@ -40,6 +40,9 @@ OPTIONS:
 
         --omit-levenshtein
             do not run the Levenshtein scanner
+
+    -p, --threads <THREADS>
+            use the specified NUMBER of threads [default: 16]
 
     -P, --path <PATH>
             path which must be scanned
