@@ -18,3 +18,4 @@ Cargo.lock
 **/*.log
 test/data/large.*
 log/*
+tmp/*

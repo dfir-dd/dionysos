@@ -5,6 +5,7 @@ use futures::executor::block_on;
 use walkdir::WalkDir;
 use std::fs::{OpenOptions};
 use std::path::{PathBuf};
+use std::time::Instant;
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
 use regex;
 use std::sync::Arc;
@@ -75,6 +76,9 @@ pub struct Dionysos {
 async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult {
     let mut result = ScannerResult::from(entry.path());
     for scanner in scanners.iter() {
+        log::trace!("starting {} on {}", scanner, entry.file_name().to_string_lossy());
+        let begin = Instant::now();
+
         for res in scanner.scan_file(&entry).into_iter() {
             match res {
                 Err(why) => {
@@ -87,6 +91,8 @@ async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::D
                 }
             }
         }
+
+        log::trace!("finished {} on {} in {}s", scanner, entry.file_name().to_string_lossy(), Instant::now().duration_since(begin).as_secs_f64());
     }
     result
 }

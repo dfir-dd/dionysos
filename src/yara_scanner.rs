@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Read;
 use std::path::Path;
+use std::time::Instant;
 use walkdir::WalkDir;
 use std::fs::File;
 use std::io::BufReader;
@@ -97,6 +98,7 @@ pub struct YaraScanner {
     timeout: u16
 }
 
+#[derive(Debug)]
 enum CompressionType {
     GZip,
     BZip2,
@@ -167,6 +169,11 @@ impl FileScanner for YaraScanner
                 CompressionType::Uncompressed
             }
         } else {
+            if let Some(m) = &magic {
+                if m.contains("compressed data") {
+                    log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
+                }
+            }
             CompressionType::Uncompressed
         };
 
@@ -364,8 +371,21 @@ impl YaraScanner {
     }
 
     fn read_into_buffer<R: Read>(&self, reader: R) -> std::io::Result<usize> {
+        log::trace!("decompressing file");
+        let begin = Instant::now();
+
         let mut reader_with_limit = BufReader::new(reader.take(self.buffer.borrow().capacity() as u64));
-        reader_with_limit.read_to_end(&mut self.buffer.borrow_mut())
+        
+        let res = reader_with_limit.read_to_end(&mut self.buffer.borrow_mut());
+        match &res {
+            Ok(bytes) => {
+                log::trace!("decompression of {} bytes done in {}s", bytes, Instant::now().duration_since(begin).as_secs_f64());
+            }
+            Err(why) => {
+                log::trace!("decompression failed: {}", why);
+            },
+        }
+        res
     }
 }
 
