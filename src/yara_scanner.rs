@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Arc;
 use walkdir::WalkDir;
 use std::fs::File;
 use std::io::BufReader;
@@ -92,9 +93,8 @@ impl YaraExternals {
 pub struct YaraScanner {
     rules: yara::Rules,
     scan_compressed: bool,
-    magic: Magic,
-    buffer: RefCell<Vec<u8>>,
-    timeout: u16
+    timeout: u16,
+    buffer_size: usize,
 }
 
 enum CompressionType {
@@ -117,7 +117,7 @@ impl FileScanner for YaraScanner
         let mut results = Vec::new();
         let file = file.path();
         
-        let magic = match self.magic.file(file) {
+        let magic = match magic!().unwrap().file(file) {
             Ok(magic) => {
                 log::info!("treating '{}' as '{}'", file.display(), &magic);
                 Some(magic)
@@ -170,27 +170,26 @@ impl FileScanner for YaraScanner
             CompressionType::Uncompressed
         };
 
-        self.buffer.borrow_mut().clear();
-
         let decompression_result = match compression_type {
             CompressionType::GZip => self.read_into_buffer(GzDecoder::new(File::open(file).unwrap())),
             CompressionType::BZip2 => self.read_into_buffer(BzDecoder::new(File::open(file).unwrap())),
             CompressionType::XZ => self.read_into_buffer(XzDecoder::new(File::open(file).unwrap())),
-            _ => Ok(0)
+            _ => Ok((0, vec![]))
         };
 
-        match decompression_result {
-            Ok(0) => (), // no decompression took place
+        let buffer = match decompression_result {
+            Ok((0, buffer)) => buffer, // no decompression took place
             Err(why) => return vec![Err(anyhow!("error while decompressing a file: {:?}", why))],
-            Ok(bytes) => {
-                if bytes == self.buffer.borrow().capacity() {
+            Ok((bytes, buffer)) => {
+                if bytes == buffer.capacity() {
                     log::warn!("file '{}' could not be decompressed completely", file.display())
                 } else {
-                    assert!(! self.buffer.borrow().is_empty());
+                    assert!(! buffer.is_empty());
                     log::info!("uncompressed {} bytes from '{}'", bytes, file.display());
                 }
+                buffer
             }
-        }
+        };
 
         let mut scanner = match self.rules.scanner() {
             Err(why) => return vec![Err(anyhow!("unable to create yara scanner: {:?}", why))],
@@ -204,9 +203,9 @@ impl FileScanner for YaraScanner
             }
         }
 
-        let scan_result = match self.buffer.borrow().is_empty() {
+        let scan_result = match buffer.is_empty() {
             true => scanner.scan_file(&file),
-            false => scanner.scan_mem(&self.buffer.borrow()).or_else(|e| Err(yara::Error::Yara(e))),
+            false => scanner.scan_mem(&buffer).or_else(|e| Err(yara::Error::Yara(e))),
         };
 
         match scan_result {
@@ -253,9 +252,8 @@ impl YaraScanner {
         Ok(Self {
             rules: compiler.compile_rules()?,
             scan_compressed: false,
-            magic: magic!().unwrap(),
-            buffer: RefCell::new(Vec::with_capacity(1024*1024*128)),
-            timeout: 240
+            timeout: 240,
+            buffer_size: 128,
         })
     }
 
@@ -264,8 +262,8 @@ impl YaraScanner {
         self
     }
 
-    pub fn with_buffer_size(self, buffer_size: usize) -> Self {
-        self.buffer.replace(Vec::with_capacity(1024*1024*buffer_size));
+    pub fn with_buffer_size(mut self, buffer_size: usize) -> Self {
+        self.buffer_size = buffer_size;
         self
     }
 
@@ -363,9 +361,11 @@ impl YaraScanner {
         lc_filename.ends_with(".zip")
     }
 
-    fn read_into_buffer<R: Read>(&self, reader: R) -> std::io::Result<usize> {
-        let mut reader_with_limit = BufReader::new(reader.take(self.buffer.borrow().capacity() as u64));
-        reader_with_limit.read_to_end(&mut self.buffer.borrow_mut())
+    fn read_into_buffer<R: Read>(&self, reader: R) -> std::io::Result<(usize, Vec<u8>)> {
+        let mut buffer = Vec::with_capacity(1024*1024*self.buffer_size);
+        let mut reader_with_limit = BufReader::new(reader.take(buffer.capacity() as u64));
+        reader_with_limit.read_to_end(&mut buffer)
+            .and_then(|b| Ok((b, buffer)))
     }
 }
 

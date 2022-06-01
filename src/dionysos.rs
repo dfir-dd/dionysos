@@ -1,14 +1,13 @@
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use futures::future;
-use futures::executor::block_on;
 use walkdir::WalkDir;
 use std::fs::{OpenOptions};
 use std::path::{PathBuf};
+use std::{thread};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
 use regex;
-use std::sync::Arc;
-use indicatif::{ProgressBar, ProgressStyle};
+use std::sync::{Arc, mpsc};
+use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerResult};
@@ -72,7 +71,7 @@ pub struct Dionysos {
     cli: Cli,
 }
 
-async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::DirEntry) -> ScannerResult {
+fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEntry) -> ScannerResult {
     let mut result = ScannerResult::from(entry.path());
     for scanner in scanners.iter() {
         for res in scanner.scan_file(&entry).into_iter() {
@@ -89,6 +88,35 @@ async fn handle_file(scanners: Arc<Vec<Box<dyn FileScanner>>>, entry: walkdir::D
         }
     }
     result
+}
+
+fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
+            tx: mpsc::Sender<ScannerResult>,
+        scanners: Arc<Vec<Box<dyn FileScanner>>>, mystatus: ProgressBar) {
+    let rx = &rx;
+    let tx = &tx;
+    loop {
+        let x = rx.recv();
+        match &x {
+            Ok(ref entry) => {
+                mystatus.set_message(entry.file_name().to_string_lossy().to_string());
+                mystatus.inc(1);
+
+                let result = handle_file(&scanners, entry);
+                if let Err(why) = tx.send(result) {
+                    log::error!("error while sending a scanner result from the worker: {}", why);
+                    drop(rx);
+                    drop(tx);
+                    return;
+                }
+            },
+            Err(_) => {
+                mystatus.finish_and_clear();
+                drop(rx);
+                drop(tx);
+            },
+        }
+    }
 }
 
 impl Dionysos {
@@ -129,48 +157,57 @@ impl Dionysos {
 
         let scanners = Arc::new(scanners);
 
-        let mut results = Vec::new();
         let count = WalkDir::new(&self.path).into_iter().count();
-        let progress = ProgressBar::new(count as u64);
+        
+        let m_progress = MultiProgress::new();
         let progress_style = ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")
+                .template("[{elapsed_precise}] {bar:32.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")
                 .progress_chars("##-");
-        progress.set_style(progress_style);
         
         let max_workers = 8;
         let mut workers = Vec::new();
+
+        let (mut tx_in, rx_in) = spmc::channel();
+        let (tx_out, rx_out) = mpsc::channel(); 
+        for _id in 0..max_workers {
+            log::trace!("creating worker #{}", _id);
+            let progress = ProgressBar::new(count as u64);
+            progress.set_style(progress_style.clone());
+            let pb = m_progress.add(progress);
+
+            let scanner = Arc::clone(&scanners);
+            let rx = rx_in.clone();
+            let tx = tx_out.clone();
+            let worker = thread::spawn(move ||{
+                worker(rx, tx, scanner, pb)
+            });
+            workers.push(worker);
+        }
+        m_progress.set_move_cursor(true);
 
         for entry in WalkDir::new(&self.path)
                 .into_iter()
                 .filter_map(|e| e.ok())
                 .filter(|e| e.file_type().is_file()) {
             log::info!("scanning '{}'", entry.path().display());
-            progress.set_message(entry.file_name().to_string_lossy().to_string());
-            while workers.len() >= max_workers {
-                let selector_future = future::select_all(workers);
-                let (result, _, wrkrs) = block_on(selector_future);
-                results.push(result);
-                progress.inc(1);
-                workers = wrkrs;
-            }
-            workers.push(Box::pin(handle_file(Arc::clone(&scanners), entry)));
+            tx_in.send(entry)?;
         }
 
-        while ! workers.is_empty() {
-            let selector_future = future::select_all(workers);
-            let (result, _, wrkrs) = block_on(selector_future);
-            results.push(result);
-            progress.inc(1);
-            workers = wrkrs;
-        }
-
-        progress.finish_and_clear();
-
-        for result in results.iter() {
-            if result.has_findings() {
-                print!("{}", result);
+        loop {
+            match rx_out.recv() {
+                Err(_why) => {
+                    drop(rx_out);
+                    break;
+                }
+                Ok(result) => {
+                    if result.has_findings() {
+                        print!("{}", result);
+                    }
+                }
             }
         }
+
+        m_progress.join_and_clear()?;
         
         Ok(())
     }

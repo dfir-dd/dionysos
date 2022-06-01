@@ -23,13 +23,13 @@ yara = "0"
 zip = "0.5"
 regex = "1.5"
 indicatif = "0.16"
-futures = {version="0.3", features=["executor", "thread-pool"]}
 filemagic = "0"
 duplicate = "0.4"
 file-owner = "0.1"
+spmc = "0.3"
 
 flate2 = "1"
-bzip2 = "0.4"
+bzip2 = "0.4.3"
 xz = "0.1"
 
 hex = "0.4"
