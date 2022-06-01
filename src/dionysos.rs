@@ -4,7 +4,7 @@ use walkdir::WalkDir;
 use std::fs::{OpenOptions};
 use std::path::{PathBuf};
 use std::{thread};
-use std::time::Instant;
+use std::time::{Instant, Duration};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
 use regex;
 use std::sync::{Arc, mpsc};
@@ -47,7 +47,7 @@ pub (crate) struct Cli {
     #[clap(short('C'), long("scan-compressed"))]
     scan_compressed: bool,
 
-    /// maximum size (in MiB) of decompression buffer, which is used to scan compressed files
+    /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
     #[clap(long("decompression-buffer"), default_value_t=128)]
     decompression_buffer_size: usize,
 
@@ -65,7 +65,11 @@ pub (crate) struct Cli {
 
     /// print matching strings (only used by yara currently)
     #[clap(short('s'), long("print-strings"))]
-    pub (crate) print_strings: bool
+    pub (crate) print_strings: bool,
+
+    /// use the specified NUMBER of threads
+    #[clap(short('p'), long("threads"), default_value_t = num_cpus::get())]
+    threads: usize,
 }
 
 pub struct Dionysos {
@@ -102,29 +106,34 @@ fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEn
 
 fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
             tx: mpsc::Sender<ScannerResult>,
-        scanners: Arc<Vec<Box<dyn FileScanner>>>, mystatus: ProgressBar) {
+        scanners: Arc<Vec<Box<dyn FileScanner>>>, mystatus: ProgressBar, progress: Arc<ProgressBar>) {
     let rx = &rx;
     let tx = &tx;
     loop {
-        let x = rx.recv();
-        match &x {
-            Ok(ref entry) => {
+        match rx.try_recv() {
+            Ok(entry) => {
                 mystatus.set_message(entry.file_name().to_string_lossy().to_string());
-                mystatus.inc(1);
+                progress.inc(1);
 
-                let result = handle_file(&scanners, entry);
+                let result = handle_file(&scanners, &entry);
                 if let Err(why) = tx.send(result) {
                     log::error!("error while sending a scanner result from the worker: {}", why);
+                    mystatus.finish_and_clear();
                     drop(rx);
                     drop(tx);
                     return;
                 }
             },
-            Err(_) => {
+            Err(mpsc::TryRecvError::Empty) => {
+                thread::sleep(Duration::from_millis(100));
+                continue;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
                 mystatus.finish_and_clear();
                 drop(rx);
                 drop(tx);
-            },
+                return;
+            }
         }
     }
 }
@@ -171,28 +180,33 @@ impl Dionysos {
         
         let m_progress = MultiProgress::new();
         let progress_style = ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] {bar:32.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")
+                .template("[{elapsed_precise}] {bar:32.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")?
                 .progress_chars("##-");
+        let progress = Arc::new(m_progress.add(ProgressBar::new(count as u64)));
+        progress.set_style(progress_style);
+
+        let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}")?;
         
-        let max_workers = 8;
+        let max_workers = self.cli.threads;
         let mut workers = Vec::new();
 
         let (mut tx_in, rx_in) = spmc::channel();
         let (tx_out, rx_out) = mpsc::channel(); 
         for _id in 0..max_workers {
             log::trace!("creating worker #{}", _id);
-            let progress = ProgressBar::new(count as u64);
-            progress.set_style(progress_style.clone());
-            let pb = m_progress.add(progress);
-
+            let pb = m_progress.add(ProgressBar::new(count as u64));
+            pb.set_style(spinner_style.clone());
+            
             let scanner = Arc::clone(&scanners);
             let rx = rx_in.clone();
             let tx = tx_out.clone();
+            let global_progress = Arc::clone(&progress);
             let worker = thread::spawn(move ||{
-                worker(rx, tx, scanner, pb)
+                worker(rx, tx, scanner, pb, global_progress)
             });
             workers.push(worker);
         }
+        drop(tx_out);
         m_progress.set_move_cursor(true);
 
         for entry in WalkDir::new(&self.path)
@@ -202,10 +216,13 @@ impl Dionysos {
             log::info!("scanning '{}'", entry.path().display());
             tx_in.send(entry)?;
         }
+        drop(tx_in);
+
+        let _ = workers.into_iter().map(|w| w.join());
 
         loop {
             match rx_out.recv() {
-                Err(_why) => {
+                Err(mpsc::RecvError) => {
                     drop(rx_out);
                     break;
                 }
@@ -217,7 +234,7 @@ impl Dionysos {
             }
         }
 
-        m_progress.join_and_clear()?;
+        m_progress.clear()?;
         
         Ok(())
     }
