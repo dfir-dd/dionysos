@@ -39,8 +39,12 @@ impl ScannerResult {
                     let headline = format!("\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename);
                     if cli.print_strings && ! yara_finding.strings.is_empty() {
                         for s in yara_finding.strings.iter() {
-                            for m in s.matches.iter() {
-                                lines.push(format!("{};\"{} at offset {:x}: {}\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data)));
+                            if s.matches.is_empty() {
+                                lines.push(format!("{};\"{}\"", headline, escape(&s.identifier)));
+                            } else {
+                                for m in s.matches.iter() {
+                                    lines.push(format!("{};\"{} at offset {:x}: {}\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data)));
+                                }
                             }
                         }
                     } else {
