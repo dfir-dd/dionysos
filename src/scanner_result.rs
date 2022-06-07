@@ -40,10 +40,17 @@ impl ScannerResult {
                     if cli.print_strings && ! yara_finding.strings.is_empty() {
                         for s in yara_finding.strings.iter() {
                             if s.matches.is_empty() {
-                                lines.push(format!("{};\"{}\"", headline, escape(&s.identifier)));
+                                match &yara_finding.value_data {
+                                    None => lines.push(format!("{};\"{}\"", headline, escape(&s.identifier))),
+                                    Some(d) => lines.push(format!("{};\"{} in {}\"", headline, escape(&s.identifier), escape(d))),
+                                }
+                                
                             } else {
                                 for m in s.matches.iter() {
-                                    lines.push(format!("{};\"{} at offset {:x}: {}\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data)));
+                                    match &yara_finding.value_data {
+                                        None => lines.push(format!("{};\"{} at offset {:x}: {}\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data))),
+                                        Some(d) => lines.push(format!("{};\"{} at offset {:x}: {} in ({})\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data), escape(d)))
+                                    }
                                 }
                             }
                         }

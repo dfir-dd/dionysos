@@ -160,6 +160,10 @@ impl Dionysos {
                 .with_scan_compressed(self.cli.scan_compressed)
                 .with_buffer_size(self.cli.decompression_buffer_size)
                 .with_timeout(self.cli.yara_timeout);
+            
+            #[cfg(feature="evtx")]
+            let yara_scanner = yara_scanner.with_scan_evtx(self.cli.yara_scan_evtx);
+            
             scanners.push(Box::new(yara_scanner));
         };
 

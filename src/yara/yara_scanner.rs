@@ -1,6 +1,7 @@
 use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
+use crate::yara::YaraScannerError;
 use crate::filescanner::*;
 use crate::scanner_result;
 use crate::scanner_result::*;
@@ -17,6 +18,12 @@ use flate2::read::GzDecoder;
 use xz::read::XzDecoder;
 use bzip2::read::BzDecoder;
 
+#[cfg(feature="evtx")]
+use evtx;
+
+#[cfg(feature="evtx")]
+use serde_json::Value;
+
 #[cfg(target_family="unix")]
 use file_owner::PathExt;
 
@@ -27,13 +34,17 @@ pub struct YaraScanner {
     scan_compressed: bool,
     timeout: u16,
     buffer_size: usize,
+    scan_evtx: bool,
+    //scan_reg: bool,
 }
 
 #[derive(Debug)]
-enum CompressionType {
+enum FileType {
     GZip,
     BZip2,
     XZ,
+    Evtx,
+    Reg,
     Uncompressed
 }
 
@@ -88,30 +99,38 @@ impl FileScanner for YaraScanner
         };
 
         // check if the file is a compressed file
-        let compression_type = 
+        let file_type = 
         if self.scan_compressed {
 
             if let Some(m) = &magic {
-                if m == "XZ compressed data"                    {CompressionType::XZ}
-                else if m.starts_with("gzip compressed data")   {CompressionType::GZip}
-                else if m.starts_with("bzip2 compressed data")  {CompressionType::BZip2}
-                else {CompressionType::Uncompressed}
+                if m == "XZ compressed data"                         {FileType::XZ}
+                else if m.starts_with("gzip compressed data")        {FileType::GZip}
+                else if m.starts_with("bzip2 compressed data")       {FileType::BZip2}
+                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
+                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
+                else {FileType::Uncompressed}
             } else {
-                CompressionType::Uncompressed
+                FileType::Uncompressed
             }
         } else {
             if let Some(m) = &magic {
                 if m.contains("compressed data") {
                     log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
+                    FileType::Uncompressed
                 }
-            }
-            CompressionType::Uncompressed
+                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
+                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
+                else {
+                    FileType::Uncompressed
+                }
+            } else {
+                FileType::Uncompressed}
         };
 
-        let decompression_result = match compression_type {
-            CompressionType::GZip => self.read_into_buffer(GzDecoder::new(File::open(file).unwrap())),
-            CompressionType::BZip2 => self.read_into_buffer(BzDecoder::new(File::open(file).unwrap())),
-            CompressionType::XZ => self.read_into_buffer(XzDecoder::new(File::open(file).unwrap())),
+        let decompression_result = match file_type {
+            FileType::GZip => self.read_into_buffer(GzDecoder::new(File::open(file).unwrap())),
+            FileType::BZip2 => self.read_into_buffer(BzDecoder::new(File::open(file).unwrap())),
+            FileType::XZ => self.read_into_buffer(XzDecoder::new(File::open(file).unwrap())),
             _ => Ok((0, vec![]))
         };
 
@@ -141,10 +160,27 @@ impl FileScanner for YaraScanner
             }
         }
 
+        #[cfg(feature="evtx")]
+        if self.scan_evtx && cfg!(feature="evtx") && matches!(file_type, FileType::Evtx) {
+            match self.scan_evtx(&mut scanner, &file) {
+                Err(why) => return vec![Err(anyhow!("{}", why))],
+                Ok(results) => return results.into_iter().map(|r| Ok(ScannerFinding::Yara(r))).collect(),
+            }
+        }
+        
+        #[cfg(feature="reg")]
+        if self.scan_reg && cfg!(feature="reg") && matches!(file_type, FileType::Reg) {
+            match self.scan_reg(&scanner, &file) {
+                Err(why) => return vec![Err(anyhow!("{}", why))],
+                Ok(results) => Ok(results)
+            }
+
+        }
         let scan_result = match buffer.is_empty() {
             true => scanner.scan_file(&file),
             false => scanner.scan_mem(&buffer).or_else(|e| Err(yara::Error::Yara(e))),
         };
+
 
         match scan_result {
             Err(why) => {
@@ -192,6 +228,9 @@ impl YaraScanner {
             scan_compressed: false,
             timeout: 240,
             buffer_size: 128,
+
+            scan_evtx: false,
+            //scan_reg: false,
         })
     }
 
@@ -207,6 +246,19 @@ impl YaraScanner {
 
     pub fn with_timeout(mut self, timeout: u16) -> Self {
         self.timeout = timeout;
+        self
+    }
+
+
+    #[cfg(feature="reg")]
+    pub fn with_scan_reg(mut self, scan_reg: bool) -> Self {
+        self.scan_reg = scan_reg;
+        self
+    }
+
+    #[cfg(feature="evtx")]
+    pub fn with_scan_evtx(mut self, scan_evtx: bool) -> Self {
+        self.scan_evtx = scan_evtx;
         self
     }
 
@@ -316,6 +368,60 @@ impl YaraScanner {
                 log::trace!("decompression failed: {}", why);
                 Err(why)
             },
+        }
+    }
+
+    #[cfg(feature="evtx")]
+    fn scan_evtx<'a>(&self, scanner: &'a mut yara::Scanner, file: &Path) -> Result<Vec<YaraFinding>, YaraScannerError> {
+        log::error!("scanning for IOCs inside evtx file '{}'", file.display());
+
+        let mut results = Vec::new();
+        let mut parser = evtx::EvtxParser::from_path(file)?;
+        for result in parser.records_json_value() {
+            match result {
+                Err(why) => return Err(why.into()),
+                Ok(record) => {
+                    let res = Self::scan_json(scanner, &record.data)?;
+                    results.extend(res.into_iter().map(|yr| yr.with_value_data(record.data.to_string())));
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    #[cfg(feature="evtx")]
+    fn scan_json<'a>(scanner: &'a mut yara::Scanner, val: &Value) -> Result<Vec<YaraFinding>, YaraScannerError> {
+        let mut results = Vec::new();
+        match val {
+            Value::Null => Ok(vec![]),
+            Value::Bool(_) => Ok(vec![]),
+            Value::Number(_) => Ok(vec![]),
+            Value::String(s) => {
+                results.extend(Self::scan_string(scanner, s)?);
+                Ok(results)
+            }
+            Value::Array(a) => {
+                for v in a.iter() {
+                    results.extend(Self::scan_json(scanner, v)?);
+                }
+                Ok(results)
+            }
+            Value::Object(o) => {
+                for (_n, v) in o.iter() {
+                    results.extend(Self::scan_json(scanner, v)?);
+                }
+                Ok(results)
+            }
+        }
+    }
+
+    #[cfg(feature="evtx")]
+    fn scan_string<'a>(scanner: &'a mut yara::Scanner, s: &String) -> Result<Vec<YaraFinding>, YaraScannerError> {
+        match scanner.scan_mem(s.as_bytes()) {
+            Err(why) => return Err(why.into()),
+            Ok(r) => {
+                Ok(r.into_iter().map(|rule| YaraFinding::from(rule)).collect())
+            }
         }
     }
 }

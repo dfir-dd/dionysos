@@ -6,6 +6,7 @@ pub struct YaraFinding {
     //pub metadatas: Vec<Metadata<'r>>,
     pub tags: Vec<String>,
     pub strings: Vec<YaraString>,
+    pub value_data: Option<String>
 }
 
 impl From<yara::Rule<'_>> for YaraFinding {
@@ -14,7 +15,15 @@ impl From<yara::Rule<'_>> for YaraFinding {
             identifier: rule.identifier.to_owned(),
             namespace: rule.namespace.to_owned(),
             tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
-            strings: rule.strings.into_iter().map(|s| s.into()).collect()
+            strings: rule.strings.into_iter().map(|s| s.into()).collect(),
+            value_data: None
         }
+    }
+}
+
+impl YaraFinding {
+    pub fn with_value_data(mut self, data: String) -> Self {
+        self.value_data = Some(data);
+        self
     }
 }
