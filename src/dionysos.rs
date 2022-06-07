@@ -71,10 +71,15 @@ pub (crate) struct Cli {
     #[clap(short('p'), long("threads"), default_value_t = num_cpus::get())]
     threads: usize,
 
-    /// also do YARA scan in Windows EVTX records (exported as XML)
+    /// also do YARA scan in Windows EVTX records (exported as JSON)
     #[clap(long("evtx"))]
-    #[cfg(feature="evtx")]
+    #[cfg(feature="scan_evtx")]
     pub (crate) yara_scan_evtx: bool,
+
+    /// also do YARA scan in Windows registry hive files
+    #[clap(long("reg"))]
+    #[cfg(feature="scan_reg")]
+    pub (crate) yara_scan_reg: bool,
 }
 
 pub struct Dionysos {
@@ -161,9 +166,12 @@ impl Dionysos {
                 .with_buffer_size(self.cli.decompression_buffer_size)
                 .with_timeout(self.cli.yara_timeout);
             
-            #[cfg(feature="evtx")]
+            #[cfg(feature="scan_evtx")]
             let yara_scanner = yara_scanner.with_scan_evtx(self.cli.yara_scan_evtx);
-            
+
+            #[cfg(feature="scan_reg")]
+            let yara_scanner = yara_scanner.with_scan_reg(self.cli.yara_scan_reg);
+
             scanners.push(Box::new(yara_scanner));
         };
 

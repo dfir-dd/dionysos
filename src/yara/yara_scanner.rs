@@ -1,3 +1,6 @@
+use nt_hive2::Hive;
+use nt_hive2::HiveParseMode;
+use nt_hive2::KeyNode;
 use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
@@ -18,10 +21,10 @@ use flate2::read::GzDecoder;
 use xz::read::XzDecoder;
 use bzip2::read::BzDecoder;
 
-#[cfg(feature="evtx")]
+#[cfg(feature="scan_evtx")]
 use evtx;
 
-#[cfg(feature="evtx")]
+#[cfg(feature="scan_evtx")]
 use serde_json::Value;
 
 #[cfg(target_family="unix")]
@@ -35,7 +38,7 @@ pub struct YaraScanner {
     timeout: u16,
     buffer_size: usize,
     scan_evtx: bool,
-    //scan_reg: bool,
+    scan_reg: bool,
 }
 
 #[derive(Debug)]
@@ -160,21 +163,33 @@ impl FileScanner for YaraScanner
             }
         }
 
-        #[cfg(feature="evtx")]
-        if self.scan_evtx && cfg!(feature="evtx") && matches!(file_type, FileType::Evtx) {
+        #[cfg(feature="scan_evtx")]
+        if self.scan_evtx && matches!(file_type, FileType::Evtx) {
             match self.scan_evtx(&mut scanner, &file) {
                 Err(why) => return vec![Err(anyhow!("{}", why))],
                 Ok(results) => return results.into_iter().map(|r| Ok(ScannerFinding::Yara(r))).collect(),
             }
         }
         
-        #[cfg(feature="reg")]
-        if self.scan_reg && cfg!(feature="reg") && matches!(file_type, FileType::Reg) {
-            match self.scan_reg(&scanner, &file) {
-                Err(why) => return vec![Err(anyhow!("{}", why))],
-                Ok(results) => Ok(results)
-            }
+        #[cfg(feature="scan_reg")]
+        if self.scan_reg && matches!(file_type, FileType::Reg) {
 
+            let hive_file = File::open(file).unwrap();
+            let hive = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
+                Ok(hive) => hive,
+                Err(why) => return vec![Err(anyhow!("{}", why))]
+            };
+
+            if hive.is_primary_file() {
+                log::trace!("scanning for IOCs inside registry hive file '{}'", file.display());
+
+                match self.scan_reg(&mut scanner, hive) {
+                    Err(why) => return vec![Err(anyhow!("{}", why))],
+                    Ok(results) => return results.into_iter().map(|r| Ok(ScannerFinding::Yara(r))).collect(),
+                }
+            } else {
+                log::trace!("'{}' is no primary hive file, using the normal yara scanner", file.display());
+            }
         }
         let scan_result = match buffer.is_empty() {
             true => scanner.scan_file(&file),
@@ -230,7 +245,7 @@ impl YaraScanner {
             buffer_size: 128,
 
             scan_evtx: false,
-            //scan_reg: false,
+            scan_reg: false,
         })
     }
 
@@ -250,13 +265,13 @@ impl YaraScanner {
     }
 
 
-    #[cfg(feature="reg")]
+    #[cfg(feature="scan_reg")]
     pub fn with_scan_reg(mut self, scan_reg: bool) -> Self {
         self.scan_reg = scan_reg;
         self
     }
 
-    #[cfg(feature="evtx")]
+    #[cfg(feature="scan_evtx")]
     pub fn with_scan_evtx(mut self, scan_evtx: bool) -> Self {
         self.scan_evtx = scan_evtx;
         self
@@ -371,9 +386,9 @@ impl YaraScanner {
         }
     }
 
-    #[cfg(feature="evtx")]
+    #[cfg(feature="scan_evtx")]
     fn scan_evtx<'a>(&self, scanner: &'a mut yara::Scanner, file: &Path) -> Result<Vec<YaraFinding>, YaraScannerError> {
-        log::error!("scanning for IOCs inside evtx file '{}'", file.display());
+        log::trace!("scanning for IOCs inside evtx file '{}'", file.display());
 
         let mut results = Vec::new();
         let mut parser = evtx::EvtxParser::from_path(file)?;
@@ -389,7 +404,7 @@ impl YaraScanner {
         Ok(results)
     }
 
-    #[cfg(feature="evtx")]
+    #[cfg(feature="scan_evtx")]
     fn scan_json<'a>(scanner: &'a mut yara::Scanner, val: &Value) -> Result<Vec<YaraFinding>, YaraScannerError> {
         let mut results = Vec::new();
         match val {
@@ -415,7 +430,7 @@ impl YaraScanner {
         }
     }
 
-    #[cfg(feature="evtx")]
+    #[cfg(feature="scan_evtx")]
     fn scan_string<'a>(scanner: &'a mut yara::Scanner, s: &String) -> Result<Vec<YaraFinding>, YaraScannerError> {
         match scanner.scan_mem(s.as_bytes()) {
             Err(why) => return Err(why.into()),
@@ -423,6 +438,50 @@ impl YaraScanner {
                 Ok(r.into_iter().map(|rule| YaraFinding::from(rule)).collect())
             }
         }
+    }
+
+
+    #[cfg(feature="scan_reg")]
+    fn scan_reg<'a>(&self, scanner: &'a mut yara::Scanner, mut hive: Hive<File>) -> Result<Vec<YaraFinding>, YaraScannerError> {
+        let root_key = hive.root_key_node()?;
+
+        let res = Self::scan_key(scanner, &mut hive, &root_key, String::new())?;
+        Ok(res)
+    }
+
+    fn scan_key<'a>(scanner: &'a mut yara::Scanner, hive: &mut Hive<File>, key: &KeyNode, path: String) -> Result<Vec<YaraFinding>, YaraScannerError> {
+        let mut results = Vec::new();
+        for v in key.values() {
+            match v.value() {
+                nt_hive2::RegistryValue::RegSZ(s) |
+                nt_hive2::RegistryValue::RegExpandSZ(s) |
+                nt_hive2::RegistryValue::RegResourceList(s) |
+                nt_hive2::RegistryValue::RegFullResourceDescriptor(s) |
+                nt_hive2::RegistryValue::RegResourceRequirementsList(s) => {
+                    results.extend(Self::scan_string(scanner, s)?.into_iter().map(|r| r.with_value_data(Self::key_display(&path, v.name(), s))));
+                }
+                nt_hive2::RegistryValue::RegBinary(b) => {
+                    results.extend(scanner.scan_mem(&b[..])?.into_iter().map(|r| YaraFinding::from(r).with_value_data(Self::key_display(&path, v.name(), "<binary data>"))))
+                }
+                nt_hive2::RegistryValue::RegMultiSZ(sl) => {
+                    for s in sl {
+                        results.extend(Self::scan_string(scanner, s)?.into_iter().map(|r| r.with_value_data(Self::key_display(&path, v.name(), s))));
+                    }
+                }
+                _ => ()
+            }
+        }
+
+        for subkey in key.subkeys(hive)?.iter() {
+            let subkey_path = format!("{}/{}", path, subkey.borrow().name());
+            results.extend(Self::scan_key(scanner, hive, &subkey.borrow(), subkey_path)?);
+        }
+
+        Ok(results)
+    }
+
+    fn key_display(path: &str, attr_name: &str, attr_value: &str) -> String {
+        format!("{}/@{} = '{}'", path, attr_name, attr_value)
     }
 }
 
