@@ -1,13 +1,10 @@
-use duplicate::duplicate_item;
 use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
-use yara::Match;
-use yara::YrString;
 use crate::filescanner::*;
 use crate::scanner_result;
 use crate::scanner_result::*;
-use std::collections::HashMap;
+use crate::yara::yara_finding::YaraFinding;
 use std::fmt::Display;
 use std::io::Read;
 use std::path::Path;
@@ -23,88 +20,7 @@ use bzip2::read::BzDecoder;
 #[cfg(target_family="unix")]
 use file_owner::PathExt;
 
-
-pub struct YaraString {
-    pub identifier: String,
-    pub matches: Vec<Match>,
-}
-
-impl From<YrString<'_>> for YaraString {
-    fn from(s: YrString<'_>) -> Self {
-        Self {
-            identifier: s.identifier.to_owned(),
-            matches: s.matches
-        }
-    }
-}
-
-pub struct YaraFinding {
-    pub identifier: String,
-    pub namespace: String,
-    //pub metadatas: Vec<Metadata<'r>>,
-    pub tags: Vec<String>,
-    pub strings: Vec<YaraString>,
-}
-
-impl From<yara::Rule<'_>> for YaraFinding {
-    fn from(rule: yara::Rule) -> Self {
-        Self {
-            identifier: rule.identifier.to_owned(),
-            namespace: rule.namespace.to_owned(),
-            tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
-            strings: rule.strings.into_iter().map(|s| s.into()).collect()
-        }
-    }
-}
-
-#[derive(Default)]
-struct YaraExternals {
-    filename: Option<String>,
-    filepath: Option<String>,
-    extension: Option<String>,
-    filetype: Option<String>,
-    md5: Option<String>,
-    owner: Option<String>
-}
-
-impl YaraExternals {
-    pub fn to_hashmap(&self) -> HashMap<&str, &str> {
-        let mut res = HashMap::new();
-
-        if let Some(x) = &self.filename  { res.insert("filename",  (&x).as_str());}
-        if let Some(x) = &self.filepath  { res.insert("filepath",  (&x).as_str());}
-        if let Some(x) = &self.extension { res.insert("extension", (&x).as_str());}
-        if let Some(x) = &self.filetype  { res.insert("filetype",  (&x).as_str());}
-        if let Some(x) = &self.md5       { res.insert("md5",       (&x).as_str());}
-        if let Some(x) = &self.owner     { res.insert("owner",     (&x).as_str());}
-
-        res
-    }
-
-    #[duplicate_item (
-        method_name      variable_name;
-        [with_filename]  [filename];
-        [with_filepath]  [filepath];
-        [with_extension] [extension];
-        [with_filetype]  [filetype];
-        [with_md5]       [md5];
-        [with_owner]     [owner]
-    )]
-    pub fn method_name(mut self, variable_name: String) -> Self {
-        self.variable_name = Some(variable_name);
-        self
-    }
-
-    pub fn dummy() -> Self {
-        Self::default()
-            .with_filename("-".to_owned())
-            .with_filepath("-".to_owned())
-            .with_extension("-".to_owned())
-            .with_filetype("-".to_owned())
-            .with_md5("-".to_owned())
-            .with_owner("dummy".to_owned())
-    }
-}
+use super::yara_externals::YaraExternals;
 
 pub struct YaraScanner {
     rules: yara::Rules,

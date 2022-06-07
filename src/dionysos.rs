@@ -12,7 +12,7 @@ use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerResult};
-use crate::yara_scanner::YaraScanner;
+use crate::yara::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
 use crate::hash_scanner::HashScanner;
@@ -70,6 +70,11 @@ pub (crate) struct Cli {
     /// use the specified NUMBER of threads
     #[clap(short('p'), long("threads"), default_value_t = num_cpus::get())]
     threads: usize,
+
+    /// also do YARA scan in Windows EVTX records (exported as XML)
+    #[clap(long("evtx"))]
+    #[cfg(feature="evtx")]
+    pub (crate) yara_scan_evtx: bool,
 }
 
 pub struct Dionysos {

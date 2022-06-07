@@ -2,7 +2,7 @@ use anyhow::Result;
 
 mod filescanner;
 mod dionysos;
-mod yara_scanner;
+mod yara;
 mod filename_scanner;
 mod scanner_result;
 mod levenshtein_scanner;

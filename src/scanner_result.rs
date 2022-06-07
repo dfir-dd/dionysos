@@ -1,7 +1,7 @@
 use std::path::{PathBuf, Path};
 use crate::dionysos::Cli;
 use crate::hash_scanner::CryptoHash;
-use crate::yara_scanner::YaraFinding;
+use crate::yara::YaraFinding;
 use std::fmt;
 use std::str;
 
