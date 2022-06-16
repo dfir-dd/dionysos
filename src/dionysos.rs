@@ -17,7 +17,7 @@ use crate::filename_scanner::FilenameScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
 use crate::hash_scanner::HashScanner;
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
 pub (crate) struct Cli {
     #[clap(flatten)]
@@ -224,7 +224,25 @@ impl Dionysos {
             workers.push(worker);
         }
         drop(tx_out);
-        m_progress.set_move_cursor(true);
+        // m_progress.set_move_cursor(true);
+
+        let cli = self.cli.clone();
+        let writer_thread = thread::spawn(move ||{
+            loop {
+                match rx_out.recv() {
+                    Err(mpsc::RecvError) => {
+                        drop(rx_out);
+                        break;
+                    }
+                    Ok(result) => {
+                        if result.has_findings() {
+                            print!("{}", result.display(&cli));
+                        }
+                    }
+                }
+            }
+        });
+        
 
         for entry in WalkDir::new(&self.path)
                 .into_iter()
@@ -236,20 +254,7 @@ impl Dionysos {
         drop(tx_in);
 
         let _ = workers.into_iter().map(|w| w.join());
-
-        loop {
-            match rx_out.recv() {
-                Err(mpsc::RecvError) => {
-                    drop(rx_out);
-                    break;
-                }
-                Ok(result) => {
-                    if result.has_findings() {
-                        print!("{}", result.display(&self.cli));
-                    }
-                }
-            }
-        }
+        let _ = writer_thread.join();
 
         m_progress.clear()?;
         
