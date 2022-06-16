@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::path::{PathBuf, Path};
 use crate::dionysos::Cli;
 use std::fmt;
 use std::str;
 
+#[derive(PartialEq, Eq, Hash)]
 pub struct CsvLine {
     scanner_name: String,
     rule_name: String,
@@ -26,16 +28,16 @@ impl Display for CsvLine {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
             writeln!(f, "\"{}\";\"{}\";\"{}\";\"{}\"",
-                self.scanner_name,
-                self.rule_name,
-                self.found_in_file,
-                self.details
+                escape(&self.scanner_name),
+                escape(&self.rule_name),
+                escape(&self.found_in_file),
+                escape(&self.details)
             )
         } else {
             writeln!(f, "\"{}\";\"{}\";\"{}\";\"\"",
-                self.scanner_name,
-                self.rule_name,
-                self.found_in_file
+                escape(&self.scanner_name),
+                escape(&self.rule_name),
+                escape(&self.found_in_file)
             )
         }
     }
@@ -43,7 +45,7 @@ impl Display for CsvLine {
 
 pub trait ScannerFinding: Send + Sync {
     fn format_readable(&self, f: &mut std::fmt::Formatter, file: &PathBuf) -> std::fmt::Result;
-    fn format_csv(&self, file: &str) -> Vec<CsvLine>;
+    fn format_csv(&self, file: &str) -> HashSet<CsvLine>;
 }
 
 pub struct ScannerResult {
@@ -65,7 +67,7 @@ impl ScannerResult {
     }
 
     pub (crate) fn display(&self, cli: &Cli) -> String {
-        let mut lines = Vec::new();
+        let mut lines = HashSet::new();
         let filename = escape(self.filename());
         for finding in self.findings.iter() {
             lines.extend(
@@ -76,6 +78,7 @@ impl ScannerResult {
                 })
             );
         }
+        let lines: Vec<String> = lines.into_iter().collect();
         lines.join("")
     }
 }
@@ -91,13 +94,4 @@ impl From<&Path> for ScannerResult {
 
 pub fn escape(value: &str) -> String {
     str::replace(value, "\"", "\\\"")
-}
-
-pub fn escape_vec(v: &Vec<u8>) -> String {
-    v.iter()
-    .map(|b| {let c = char::from(*b); if c.is_ascii_graphic() {
-        c.to_string() } else {
-            format!("\\{:02x}", b)
-        }
-    }).collect::<Vec<String>>().join("")
 }

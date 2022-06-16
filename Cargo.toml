@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "0.10.3"
+version = "0.10.4"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
@@ -33,6 +33,7 @@ duplicate = "0.4"
 file-owner = "0.1"
 spmc = "0.3"
 num_cpus = "1.13"
+maplit = "1"
 
 flate2 = "1"
 bzip2 = "0.4.3"

@@ -1,7 +1,9 @@
+use maplit::hashset;
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
 use crate::scanner_result::{ScannerFinding, CsvLine};
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::path::Path;
 pub struct LevenshteinScanner {
@@ -71,8 +73,8 @@ impl ScannerFinding for LevenshteinScannerFinding {
         todo!()
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> Vec<crate::scanner_result::CsvLine> {
-        vec![CsvLine::new("Levenshtein", &format!("{}", &self.file_name), file, String::new())]
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+        hashset![CsvLine::new("Levenshtein", &format!("{}", &self.file_name), file, String::new())]
     }
 }
 

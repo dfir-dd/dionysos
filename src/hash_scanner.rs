@@ -3,6 +3,7 @@ use std::{collections::HashSet, fs::File};
 use std::convert::TryInto;
 use std::hash::Hash;
 use anyhow::{Result,anyhow};
+use maplit::hashset;
 use md5::{Md5, Digest};
 use memmap::MmapOptions;
 use sha1::Sha1;
@@ -161,7 +162,7 @@ impl ScannerFinding for HashScannerFinding {
         todo!()
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> Vec<crate::scanner_result::CsvLine> {
-        vec![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+        hashset![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
     }
 }

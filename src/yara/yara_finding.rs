@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::scanner_result::{ScannerFinding, CsvLine};
 
 use super::yara_string::YaraString;
@@ -36,35 +38,35 @@ impl ScannerFinding for YaraFinding {
         todo!()
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> Vec<crate::scanner_result::CsvLine> {
-        let mut lines = Vec::new();
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+        let mut lines = HashSet::new();
 
         if self.strings.is_empty() {
-            lines.push(
+            lines.insert(
                 CsvLine::new("Yara", &self.identifier, file, String::new())
-            )
+            );
         } else {
             for s in self.strings.iter() {
                 if s.matches.is_empty() {
                     match &self.value_data {
-                        None => lines.push(
+                        None => {lines.insert(
                             CsvLine::new("Yara",&self.identifier,file,s.identifier.clone())
-                        ),
-                        Some(d) => lines.push(
+                        );}
+                        Some(d) => {lines.insert(
                             CsvLine::new("Yara",&self.identifier,file,format!("{} in {}", s.identifier, d))
-                        ),
+                        );}
                     }
                 } else {
                     for m in s.matches.iter() {
                         match &self.value_data {
-                            None => lines.push(
+                            None => {lines.insert(
                                 CsvLine::new("Yara",&self.identifier,file,
                                 format!("{} at offset {:x}: {}", s.identifier, m.offset, escape_vec(&m.data)))
-                            ),
-                            Some(d) => lines.push(
+                            );}
+                            Some(d) => {lines.insert(
                                 CsvLine::new("Yara",&self.identifier,file,
                                 format!("{} at offset {:x}: {} in ({})", s.identifier, m.offset, escape_vec(&m.data), d))
-                            ),
+                            );}
                         }
                     }
                 }

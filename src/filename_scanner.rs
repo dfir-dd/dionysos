@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 
+use maplit::hashset;
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
@@ -46,7 +48,7 @@ impl ScannerFinding for FilenameFinding {
         todo!()
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> Vec<crate::scanner_result::CsvLine> {
-        vec![CsvLine::new("Filename", &self.filename, file, String::new())]
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+        hashset![CsvLine::new("Filename", &self.filename, file, String::new())]
     }
 }
