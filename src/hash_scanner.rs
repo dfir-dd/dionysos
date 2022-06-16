@@ -10,7 +10,7 @@ use sha2::Sha256;
 use walkdir::DirEntry;
 
 use crate::filescanner::FileScanner;
-use crate::scanner_result::ScannerFinding;
+use crate::scanner_result::{ScannerFinding, CsvLine};
 
 const MD5_SIZE: usize = 128 / 8;
 const SHA1_SIZE: usize = 160 / 8;
@@ -87,7 +87,7 @@ impl HashScanner {
         }
     }
 
-    fn scan_slice<S: AsRef<[u8]>>(&self, slice: S) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_slice<S: AsRef<[u8]>>(&self, slice: S) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         let mut hashes = Vec::new();
 
         if self.has_md5_hashes {
@@ -117,7 +117,7 @@ impl HashScanner {
         let mut results = Vec::new();
         for h in &hashes {
             if self.hashes.contains(&h) {
-                results.push(Ok(ScannerFinding::Hash(h.clone())));
+                results.push(Ok(Box::new(HashScannerFinding{hash: h.clone()}) as Box<dyn ScannerFinding>));
             }
         }
         results
@@ -130,9 +130,8 @@ impl Display for HashScanner {
     }
 }
 
-
 impl FileScanner for HashScanner {
-    fn scan_file(&self, entry: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_file(&self, entry: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         const EMPTY_SLICE: [u8; 0] = [];
 
         match entry.metadata() {
@@ -150,5 +149,19 @@ impl FileScanner for HashScanner {
             }
         }
 
+    }
+}
+
+struct HashScannerFinding {
+    hash: CryptoHash,
+}
+
+impl ScannerFinding for HashScannerFinding {
+    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &std::path::PathBuf) -> std::fmt::Result {
+        todo!()
+    }
+
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> Vec<crate::scanner_result::CsvLine> {
+        vec![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
     }
 }

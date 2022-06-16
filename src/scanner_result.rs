@@ -1,20 +1,54 @@
+use std::fmt::Display;
 use std::path::{PathBuf, Path};
 use crate::dionysos::Cli;
-use crate::hash_scanner::CryptoHash;
-use crate::yara::YaraFinding;
 use std::fmt;
 use std::str;
 
-pub enum ScannerFinding {
-    Yara(YaraFinding),
-    Filename(String),
-    Levenshtein(String),
-    Hash(CryptoHash)
+pub struct CsvLine {
+    scanner_name: String,
+    rule_name: String,
+    found_in_file: String,
+    details: String,
+}
+
+impl CsvLine {
+    pub fn new(scanner_name: &str, rule_name: &str, found_in_file: &str, details: String) -> Self {
+        Self {
+            scanner_name: scanner_name.to_owned(),
+            rule_name: rule_name.to_owned(),
+            found_in_file: found_in_file.to_owned(),
+            details
+        }
+    }
+}
+
+impl Display for CsvLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            writeln!(f, "\"{}\";\"{}\";\"{}\";\"{}\"",
+                self.scanner_name,
+                self.rule_name,
+                self.found_in_file,
+                self.details
+            )
+        } else {
+            writeln!(f, "\"{}\";\"{}\";\"{}\";\"\"",
+                self.scanner_name,
+                self.rule_name,
+                self.found_in_file
+            )
+        }
+    }
+}
+
+pub trait ScannerFinding: Send + Sync {
+    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &PathBuf) -> std::fmt::Result;
+    fn format_csv(&self, file: &str) -> Vec<CsvLine>;
 }
 
 pub struct ScannerResult {
     filename: PathBuf,
-    findings: Vec<ScannerFinding>
+    findings: Vec<Box<dyn ScannerFinding>>
 }
 
 impl ScannerResult {
@@ -22,7 +56,7 @@ impl ScannerResult {
         self.filename.to_str().as_ref().unwrap()
     }
 
-    pub fn add_finding(&mut self, finding: ScannerFinding) {
+    pub fn add_finding(&mut self, finding: Box<dyn ScannerFinding>) {
         self.findings.push(finding);
     }
 
@@ -34,42 +68,15 @@ impl ScannerResult {
         let mut lines = Vec::new();
         let filename = escape(self.filename());
         for finding in self.findings.iter() {
-            match &finding {
-                ScannerFinding::Yara(yara_finding) => {
-                    let headline = format!("\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename);
-                    if cli.print_strings && ! yara_finding.strings.is_empty() {
-                        for s in yara_finding.strings.iter() {
-                            if s.matches.is_empty() {
-                                match &yara_finding.value_data {
-                                    None => lines.push(format!("{};\"{}\"", headline, escape(&s.identifier))),
-                                    Some(d) => lines.push(format!("{};\"{} in {}\"", headline, escape(&s.identifier), escape(d))),
-                                }
-                                
-                            } else {
-                                for m in s.matches.iter() {
-                                    match &yara_finding.value_data {
-                                        None => lines.push(format!("{};\"{} at offset {:x}: {}\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data))),
-                                        Some(d) => lines.push(format!("{};\"{} at offset {:x}: {} in ({})\"", headline, escape(&s.identifier), m.offset, escape_vec(&m.data), escape(d)))
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        lines.push(format!("{};\"\"", headline));
-                    }
-                }
-                ScannerFinding::Filename(regex) => {
-                    lines.push(format!("\"{}\";\"{}\";\"{}\";\"\"", "Filename", escape(regex), &filename));
-                }
-                ScannerFinding::Levenshtein(original) => {
-                    lines.push(format!("\"{}\";\"{}\";\"{}\";\"\"", "Levenshtein", escape(original), &filename));
-                }
-                &ScannerFinding::Hash(hash) => {
-                    lines.push(format!("\"{}\";\"{}\";\"{}\";\"\"", "Hash", hash, &filename));
-                }
-            }
+            lines.extend(
+                finding.format_csv(&filename).iter().map(|csv| if cli.print_strings {
+                    format!("{:#}", csv)
+                } else {
+                    format!("{}", csv)
+                })
+            );
         }
-        lines.join("\n") + "\n"
+        lines.join("")
     }
 }
 
@@ -93,27 +100,4 @@ pub fn escape_vec(v: &Vec<u8>) -> String {
             format!("\\{:02x}", b)
         }
     }).collect::<Vec<String>>().join("")
-}
-
-impl fmt::Display for ScannerResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let filename = escape(self.filename());
-        for finding in self.findings.iter() {
-            match &finding {
-                ScannerFinding::Yara(yara_finding) => {
-                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Yara", escape(&yara_finding.identifier), &filename)?;
-                }
-                ScannerFinding::Filename(regex) => {
-                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Filename", escape(regex), &filename)?;
-                }
-                ScannerFinding::Levenshtein(original) => {
-                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Levenshtein", escape(original), &filename)?;
-                }
-                &ScannerFinding::Hash(hash) => {
-                    writeln!(f, "\"{}\";\"{}\";\"{}\"", "Hash", hash, &filename)?;
-                }
-            }
-        }
-        Ok(())
-    }
 }

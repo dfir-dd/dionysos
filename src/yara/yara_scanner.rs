@@ -60,7 +60,7 @@ impl Display for YaraScanner {
 
 impl FileScanner for YaraScanner
 {
-    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         let mut results = Vec::new();
         let file = file.path();
         
@@ -167,7 +167,7 @@ impl FileScanner for YaraScanner
         if self.scan_evtx && matches!(file_type, FileType::Evtx) {
             match self.scan_evtx(&mut scanner, &file) {
                 Err(why) => return vec![Err(anyhow!("{}", why))],
-                Ok(results) => return results.into_iter().map(|r| Ok(ScannerFinding::Yara(r))).collect(),
+                Ok(results) => return results.into_iter().map(|r| Ok(Box::new(r) as Box<dyn ScannerFinding>)).collect(),
             }
         }
         
@@ -185,7 +185,7 @@ impl FileScanner for YaraScanner
 
                 match self.scan_reg(&mut scanner, hive) {
                     Err(why) => return vec![Err(anyhow!("{}", why))],
-                    Ok(results) => return results.into_iter().map(|r| Ok(ScannerFinding::Yara(r))).collect(),
+                    Ok(results) => return results.into_iter().map(|r| Ok(Box::new(r) as Box<dyn ScannerFinding>)).collect(),
                 }
             } else {
                 log::trace!("'{}' is no primary hive file, using the normal yara scanner", file.display());
@@ -206,7 +206,7 @@ impl FileScanner for YaraScanner
                     log::trace!("new yara finding: {} in '{}'",
                         scanner_result::escape(&r.identifier),
                         file.display());
-                    Ok(ScannerFinding::Yara(YaraFinding::from(r)))}
+                    Ok(Box::new(YaraFinding::from(r)) as Box<dyn ScannerFinding>)}
                 ));
             }
         }

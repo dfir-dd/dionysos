@@ -1,7 +1,7 @@
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
-use crate::scanner_result::{ScannerFinding};
+use crate::scanner_result::{ScannerFinding, CsvLine};
 use std::fmt::Display;
 use std::path::Path;
 pub struct LevenshteinScanner {
@@ -28,7 +28,7 @@ impl Default for LevenshteinScanner {
 }
 
 impl FileScanner for LevenshteinScanner {
-    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         self.intern_scan_file(file.path())
     }
 }
@@ -40,15 +40,15 @@ impl Display for LevenshteinScanner {
 }
 
 impl LevenshteinScanner {
-    fn intern_scan_file(&self, file: &Path) -> Vec<anyhow::Result<ScannerFinding>> {        
+    fn intern_scan_file(&self, file: &Path) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {        
         match file.file_name() {
             None => vec![],
             Some(file_name) => match file_name.to_str() {
                 Some(os_fn) => {
-                    let res:  Vec<anyhow::Result<ScannerFinding>> = self.wellknown_files
+                    let res:  Vec<anyhow::Result<Box<dyn ScannerFinding>>> = self.wellknown_files
                         .iter()
                         .filter(|l| has_levenshtein_distance_one(&os_fn.chars().collect(), l))
-                        .map(|l| Ok(ScannerFinding::Levenshtein(l.iter().collect())))
+                        .map(|l| Ok(Box::new(LevenshteinScannerFinding{file_name: l.iter().collect()}) as Box<dyn ScannerFinding>))
                         .collect();
                     if file_name == "expl0rer.exe" {
                         assert_eq!(res.len(), 1);
@@ -58,6 +58,21 @@ impl LevenshteinScanner {
                 None => vec![]
             }
         }
+    }
+}
+
+
+struct LevenshteinScannerFinding {
+    file_name: String,
+}
+
+impl ScannerFinding for LevenshteinScannerFinding {
+    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &std::path::PathBuf) -> std::fmt::Result {
+        todo!()
+    }
+
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> Vec<crate::scanner_result::CsvLine> {
+        vec![CsvLine::new("Levenshtein", &format!("{}", &self.file_name), file, String::new())]
     }
 }
 
