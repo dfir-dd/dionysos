@@ -80,6 +80,10 @@ pub (crate) struct Cli {
     #[clap(long("reg"))]
     #[cfg(feature="scan_reg")]
     pub (crate) yara_scan_reg: bool,
+
+    /// display a progress bar (requires counting the number of files to be scanned before a progress bar can be displayed)
+    #[clap(long("progress"))]
+    pub(crate) display_progress: bool,
 }
 
 pub struct Dionysos {
@@ -116,19 +120,25 @@ fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEn
 
 fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
             tx: mpsc::Sender<ScannerResult>,
-        scanners: Arc<Vec<Box<dyn FileScanner>>>, mystatus: ProgressBar, progress: Arc<ProgressBar>) {
+        scanners: Arc<Vec<Box<dyn FileScanner>>>, mystatus: Option<ProgressBar>, progress: Option<Arc<ProgressBar>>) {
     let rx = &rx;
     let tx = &tx;
     loop {
         match rx.try_recv() {
             Ok(entry) => {
-                mystatus.set_message(entry.file_name().to_string_lossy().to_string());
-                progress.inc(1);
+                if let Some(s) = &mystatus {
+                    s.set_message(entry.file_name().to_string_lossy().to_string());
+                }
+                if let Some(p) = &progress {
+                    p.inc(1);
+                }
 
                 let result = handle_file(&scanners, &entry);
                 if let Err(why) = tx.send(result) {
                     log::error!("error while sending a scanner result from the worker: {}", why);
-                    mystatus.finish_and_clear();
+                    if let Some(s) = mystatus {
+                        s.finish_and_clear();
+                    }
                     drop(rx);
                     drop(tx);
                     return;
@@ -139,7 +149,9 @@ fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
                 continue;
             }
             Err(mpsc::TryRecvError::Disconnected) => {
-                mystatus.finish_and_clear();
+                if let Some(s) = &mystatus {
+                    s.finish_and_clear();
+                }
                 drop(rx);
                 drop(tx);
                 return;
@@ -158,6 +170,99 @@ impl Dionysos {
 
         log::info!("running dionysos version {}", env!("CARGO_PKG_VERSION"));
 
+        let scanners = self.init_scanners()?;
+        let (m_progress, progress) = self.create_progress()?;
+
+        let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}")?;
+        
+        let max_workers = self.cli.threads;
+        let mut workers = Vec::new();
+
+        let (mut tx_in, rx_in) = spmc::channel();
+        let (tx_out, rx_out) = mpsc::channel(); 
+        for _id in 0..max_workers {
+            log::trace!("creating worker #{}", _id);
+            let pb = match &m_progress {
+                None => None,
+                Some(m_progress) => {
+                    let pb = m_progress.add(ProgressBar::new_spinner());
+                    pb.set_style(spinner_style.clone());
+                    Some(pb)
+                }
+            };
+            
+            let scanner = Arc::clone(&scanners);
+            let rx = rx_in.clone();
+            let tx = tx_out.clone();
+            let global_progress = progress.as_ref().and_then(|p|Some(Arc::clone(&p)));
+            let worker = thread::spawn(move ||{
+                worker(rx, tx, scanner, pb, global_progress)
+            });
+            workers.push(worker);
+        }
+        drop(tx_out);
+
+        let cli = self.cli.clone();
+        let writer_thread = thread::spawn(move ||{
+            loop {
+                match rx_out.recv() {
+                    Err(mpsc::RecvError) => {
+                        drop(rx_out);
+                        break;
+                    }
+                    Ok(result) => {
+                        if result.has_findings() {
+                            print!("{}", result.display(&cli));
+                        }
+                    }
+                }
+            }
+        });
+        
+
+        for entry in WalkDir::new(&self.path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().is_file()) {
+            log::info!("scanning '{}'", entry.path().display());
+            tx_in.send(entry)?;
+        }
+        drop(tx_in);
+
+        let _ = workers.into_iter().map(|w| w.join());
+        let _ = writer_thread.join();
+
+        if let Some(mp) = m_progress {
+            mp.clear()?;
+        }
+        
+        Ok(())
+    }
+
+    fn create_progress(&self) -> Result<(Option<MultiProgress>, Option<Arc<ProgressBar>>)> {
+        let m_progress = match self.cli.display_progress {
+            false => None,
+            true => {
+                let m_progress = MultiProgress::new();
+                Some(m_progress)
+            }
+        };
+        let progress = match &m_progress {
+            None => None,
+            Some(m_progress) => {
+                let progress_style = ProgressStyle::default_bar()
+                        .template("[{elapsed_precise}] {bar:32.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")?
+                        .progress_chars("##-");
+                let count = WalkDir::new(&self.path).into_iter().count();
+                let progress = Arc::new(m_progress.add(ProgressBar::new(count as u64)));
+                progress.set_style(progress_style);
+                Some(progress)
+            }
+        };
+        Ok((m_progress, progress))
+    }
+
+    fn init_scanners(&self) -> Result<Arc<Vec<Box<dyn FileScanner>>>> {
         let mut scanners: Vec<Box<dyn FileScanner>> = Vec::new();
 
         if let Some(ref yara_rules) = self.yara_rules {
@@ -191,74 +296,7 @@ impl Dionysos {
             scanners.push(Box::new(hash_scanner));
         }
 
-        let scanners = Arc::new(scanners);
-
-        let count = WalkDir::new(&self.path).into_iter().count();
-        
-        let m_progress = MultiProgress::new();
-        let progress_style = ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] {bar:32.cyan/blue} {pos:>9}/{len:9}({percent}%) {msg}")?
-                .progress_chars("##-");
-        let progress = Arc::new(m_progress.add(ProgressBar::new(count as u64)));
-        progress.set_style(progress_style);
-
-        let spinner_style = ProgressStyle::with_template("{prefix:.bold.dim} {spinner} {wide_msg}")?;
-        
-        let max_workers = self.cli.threads;
-        let mut workers = Vec::new();
-
-        let (mut tx_in, rx_in) = spmc::channel();
-        let (tx_out, rx_out) = mpsc::channel(); 
-        for _id in 0..max_workers {
-            log::trace!("creating worker #{}", _id);
-            let pb = m_progress.add(ProgressBar::new(count as u64));
-            pb.set_style(spinner_style.clone());
-            
-            let scanner = Arc::clone(&scanners);
-            let rx = rx_in.clone();
-            let tx = tx_out.clone();
-            let global_progress = Arc::clone(&progress);
-            let worker = thread::spawn(move ||{
-                worker(rx, tx, scanner, pb, global_progress)
-            });
-            workers.push(worker);
-        }
-        drop(tx_out);
-        // m_progress.set_move_cursor(true);
-
-        let cli = self.cli.clone();
-        let writer_thread = thread::spawn(move ||{
-            loop {
-                match rx_out.recv() {
-                    Err(mpsc::RecvError) => {
-                        drop(rx_out);
-                        break;
-                    }
-                    Ok(result) => {
-                        if result.has_findings() {
-                            print!("{}", result.display(&cli));
-                        }
-                    }
-                }
-            }
-        });
-        
-
-        for entry in WalkDir::new(&self.path)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().is_file()) {
-            log::info!("scanning '{}'", entry.path().display());
-            tx_in.send(entry)?;
-        }
-        drop(tx_in);
-
-        let _ = workers.into_iter().map(|w| w.join());
-        let _ = writer_thread.join();
-
-        m_progress.clear()?;
-        
-        Ok(())
+        Ok(Arc::new(scanners))
     }
 
     fn init_logging(&self) -> Result<()> {

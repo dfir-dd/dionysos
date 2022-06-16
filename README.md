@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.10.1
+dionysos 0.10.3
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -50,6 +50,10 @@ OPTIONS:
     -P, --path <PATH>
             path which must be scanned
 
+        --progress
+            display a progress bar (requires counting the number of files to be scanned before a
+            progress bar can be displayed)
+
     -q, --quiet
             Less output per occurrence
 
@@ -72,6 +76,7 @@ OPTIONS:
 
         --yara-timeout <YARA_TIMEOUT>
             timeout for the yara scanner, in seconds [default: 240]
+
 ```
 
 # Developer guide
