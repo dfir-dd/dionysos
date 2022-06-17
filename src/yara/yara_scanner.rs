@@ -111,7 +111,12 @@ impl FileScanner for YaraScanner
                 else if m.starts_with("bzip2 compressed data")       {FileType::BZip2}
                 else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
                 else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
-                else {FileType::Uncompressed}
+                else {
+                    if m.contains("compressed data") {
+                        log::warn!("unknown compression format: '{}', file will be handled without decompression", m);
+                    }
+                    FileType::Uncompressed
+                }
             } else {
                 FileType::Uncompressed
             }
