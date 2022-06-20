@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::path::{PathBuf, Path};
+use serde_json::Value;
+
 use crate::dionysos::Cli;
 use std::fmt;
 use std::str;
@@ -46,6 +48,7 @@ impl Display for CsvLine {
 pub trait ScannerFinding: Send + Sync {
     fn format_readable(&self, file: &str, show_details: bool) -> Vec<String>;
     fn format_csv(&self, file: &str) -> HashSet<CsvLine>;
+    fn to_json(&self, file: &str) -> Value;
 }
 
 pub struct ScannerResult {
@@ -85,6 +88,11 @@ impl ScannerResult {
                     lines.extend(
                         finding.format_readable( &filename, cli.print_strings)
                     );
+                },
+                crate::dionysos::OutputFormat::JSON => {
+                    lines.push(
+                        finding.to_json(&filename).to_string()
+                    )
                 }
             }
         }

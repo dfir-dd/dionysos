@@ -6,6 +6,7 @@ use anyhow::{Result,anyhow};
 use maplit::hashset;
 use md5::{Md5, Digest};
 use memmap::MmapOptions;
+use serde_json::json;
 use sha1::Sha1;
 use sha2::Sha256;
 use walkdir::DirEntry;
@@ -166,5 +167,12 @@ impl ScannerFinding for HashScannerFinding {
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
         hashset![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
+    }
+    fn to_json(&self, file: &str) -> serde_json::Value {
+        json!({
+            "01_scanner": "hash",
+            "02_suspicious_file": file,
+            "03_hash": format!("{}", self.hash)
+        })
     }
 }

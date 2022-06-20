@@ -20,7 +20,8 @@ use crate::hash_scanner::HashScanner;
 #[derive(ArgEnum, Clone)]
 pub(crate) enum OutputFormat {
     CSV,
-    TXT
+    TXT,
+    JSON
 }
 
 #[derive(Parser, Clone)]

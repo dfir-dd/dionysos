@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use serde_json::{json, Value};
+
 use crate::scanner_result::{ScannerFinding, CsvLine};
 
 use super::yara_string::YaraString;
@@ -97,6 +99,22 @@ impl ScannerFinding for YaraFinding {
         }
 
         lines
+    }
+    fn to_json(&self, file: &str) -> serde_json::Value {
+        json!({
+            "01_scanner": "yara",
+            "02_suspicious_file": file,
+            "03_value": self.value_data,
+            "04_strings": self.strings.iter().map(|s: &YaraString| {
+                json!({
+                    "identifier": s.identifier,
+                    "matches": s.matches.iter().map(|m| json!({
+                        "offset": m.offset,
+                        "data": escape_vec(&m.data)
+                    })).collect::<Vec<Value>>()
+                })
+            }).collect::<Vec<Value>>()
+        })
     }
 }
 

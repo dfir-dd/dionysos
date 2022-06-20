@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 
 use maplit::hashset;
+use serde_json::json;
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
@@ -63,5 +64,12 @@ impl ScannerFinding for FilenameFinding {
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
         hashset![CsvLine::new("Filename", &self.filename, file, String::new())]
+    }
+    fn to_json(&self, file: &str) -> serde_json::Value {
+        json!({
+            "01_scanner": "filename",
+            "02_suspicious_file": file,
+            "03_pattern": format!("{}", self.pattern)
+        })
     }
 }

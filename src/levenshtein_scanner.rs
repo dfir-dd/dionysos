@@ -1,4 +1,5 @@
 use maplit::hashset;
+use serde_json::json;
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
@@ -77,6 +78,14 @@ impl ScannerFinding for LevenshteinScannerFinding {
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
         hashset![CsvLine::new("Levenshtein", &format!("{}", &self.file_name), file, String::new())]
+    }
+
+    fn to_json(&self, file: &str) -> serde_json::Value {
+        json!({
+            "01_scanner": "levenshtein",
+            "02_suspicious_file": file,
+            "03_original_name": self.file_name
+        })
     }
 }
 
