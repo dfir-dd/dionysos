@@ -7,6 +7,8 @@ mod filename_scanner;
 mod scanner_result;
 mod levenshtein_scanner;
 mod hash_scanner;
+mod csv_line;
+
 use dionysos::*;
 
 fn main() -> Result <()> {

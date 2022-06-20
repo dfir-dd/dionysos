@@ -13,14 +13,14 @@ cargo install dionysos
 | Feature | Details |
 |-|-|
 |Scanners | filenames (by regular expressions), similar filenames (Levenshtein), yara, hashes|
-| Output formats | human-readable text (txt), comma-separated values (csv), JavaScript Object Notation (JSON), can be selected with `--format <txt\|csv\|json>` |
+| Output formats | human-readable text (txt), comma-separated values (csv, conforming to RFC4180), JavaScript Object Notation (json), can be selected with `--format <txt\|csv\|json>` |
 | Scan of compressed files | yara-scan of gz and bz2 compressed files is supported; see `-C` switch. Be aware that files are decompressed into a decompression buffer, and that every thread gets its own decompression buffer. You should make sure that you have sufficient memory. If you need larger buffers, you can limit the number of threads using `--threads` |
 | Special features | yara-scan in Windows evtx files and Windows registry hives using `--evtx` and `--reg`|
 
 
 # Usage
 ```
-dionysos 0.11.0
+dionysos 0.11.1
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 

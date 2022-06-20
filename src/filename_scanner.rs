@@ -6,7 +6,8 @@ use serde_json::json;
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
-use crate::scanner_result::{ScannerFinding, CsvLine};
+use crate::csv_line::CsvLine;
+use crate::scanner_result::ScannerFinding;
 
 pub struct FilenameScanner {
     patterns: Vec<regex::Regex>,
@@ -38,7 +39,6 @@ impl FileScanner for FilenameScanner
                     Ok(
                         Box::new(
                             FilenameFinding{
-                                filename: filename.to_owned(),
                                 pattern: pattern.clone()
                             }
                         ) as Box<dyn ScannerFinding>
@@ -51,7 +51,6 @@ impl FileScanner for FilenameScanner
 }
 
 struct FilenameFinding {
-    filename: String,
     pattern: regex::Regex,
 }
 
@@ -62,8 +61,8 @@ impl ScannerFinding for FilenameFinding {
         ]
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
-        hashset![CsvLine::new("Filename", &self.filename, file, String::new())]
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
+        hashset![CsvLine::new("Filename", &format!("{}", self.pattern), file, String::new())]
     }
     fn to_json(&self, file: &str) -> serde_json::Value {
         json!({

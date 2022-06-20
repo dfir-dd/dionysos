@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use serde_json::{json, Value};
 
-use crate::scanner_result::{ScannerFinding, CsvLine};
+use crate::csv_line::CsvLine;
+use crate::scanner_result::ScannerFinding;
 
 use super::yara_string::YaraString;
 
@@ -63,7 +64,7 @@ impl ScannerFinding for YaraFinding {
         lines
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
         let mut lines = HashSet::new();
 
         if self.strings.is_empty() {

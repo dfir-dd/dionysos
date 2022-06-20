@@ -3,7 +3,8 @@ use serde_json::json;
 use walkdir::DirEntry;
 
 use crate::filescanner::*;
-use crate::scanner_result::{ScannerFinding, CsvLine};
+use crate::csv_line::CsvLine;
+use crate::scanner_result::ScannerFinding;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::path::Path;
@@ -76,7 +77,7 @@ impl ScannerFinding for LevenshteinScannerFinding {
         ]
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
         hashset![CsvLine::new("Levenshtein", &format!("{}", &self.file_name), file, String::new())]
     }
 

@@ -1,49 +1,10 @@
 use std::collections::HashSet;
-use std::fmt::Display;
 use std::path::{PathBuf, Path};
 use serde_json::Value;
 
+use crate::csv_line::CsvLine;
 use crate::dionysos::Cli;
-use std::fmt;
 use std::str;
-
-#[derive(PartialEq, Eq, Hash)]
-pub struct CsvLine {
-    scanner_name: String,
-    rule_name: String,
-    found_in_file: String,
-    details: String,
-}
-
-impl CsvLine {
-    pub fn new(scanner_name: &str, rule_name: &str, found_in_file: &str, details: String) -> Self {
-        Self {
-            scanner_name: scanner_name.to_owned(),
-            rule_name: rule_name.to_owned(),
-            found_in_file: found_in_file.to_owned(),
-            details
-        }
-    }
-}
-
-impl Display for CsvLine {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if f.alternate() {
-            write!(f, "\"{}\";\"{}\";\"{}\";\"{}\"",
-                escape(&self.scanner_name),
-                escape(&self.rule_name),
-                escape(&self.found_in_file),
-                escape(&self.details)
-            )
-        } else {
-            write!(f, "\"{}\";\"{}\";\"{}\";\"\"",
-                escape(&self.scanner_name),
-                escape(&self.rule_name),
-                escape(&self.found_in_file)
-            )
-        }
-    }
-}
 
 pub trait ScannerFinding: Send + Sync {
     fn format_readable(&self, file: &str, show_details: bool) -> Vec<String>;

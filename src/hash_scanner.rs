@@ -12,7 +12,8 @@ use sha2::Sha256;
 use walkdir::DirEntry;
 
 use crate::filescanner::FileScanner;
-use crate::scanner_result::{ScannerFinding, CsvLine};
+use crate::csv_line::CsvLine;
+use crate::scanner_result::ScannerFinding;
 
 const MD5_SIZE: usize = 128 / 8;
 const SHA1_SIZE: usize = 160 / 8;
@@ -165,7 +166,7 @@ impl ScannerFinding for HashScannerFinding {
         ]
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
         hashset![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
     }
     fn to_json(&self, file: &str) -> serde_json::Value {
