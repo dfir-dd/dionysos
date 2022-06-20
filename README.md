@@ -10,7 +10,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.10.3
+dionysos 0.11.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -27,6 +27,9 @@ OPTIONS:
 
         --evtx
             also do YARA scan in Windows EVTX records (exported as JSON)
+
+    -f, --format <OUTPUT_FORMAT>
+            output format [default: txt] [possible values: csv, txt]
 
     -F, --filename <FILENAMES>
             regular expression to match against the basename of files. This parameter can be
@@ -124,21 +127,3 @@ impl FileScanner for FilenameScanner
 ### 3. Add your scanner to the scanner chain
 
 Which is currently hard-coded in `Dionysos::run()` (in [src/dionysos.rs](src/dionysos.rs))
-
-# Feature ideas
-
-- [x] use yara rules,
-- [x] including variables (e.g. import "hash")
-- [x] use lists of regular expressions for filesystem searches
-- [x] write results to console / log
-- [x] output must use an easy-to-parse format, while optionally staying human readable to best effort
-- [ ] highly optional: use the same list to search MFT & UsnJrnl in case files were deleted
-- [x] usage via console, cmd args
-- [ ] ~~optional: curses fontend (???)~~
-- [x] configuration of log level via command line
-- [x] levensthein-scanner
-- [x] use of one parameter to pass yara rules, which might be a file, a zip container or a directory
-- [x] Scan Windows Registry files -> idea: use nt_hive2
-- [x] Scan Windows Event Logs
-- [x] Scan compressed files
-

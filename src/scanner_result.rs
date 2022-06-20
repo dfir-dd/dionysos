@@ -27,14 +27,14 @@ impl CsvLine {
 impl Display for CsvLine {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            writeln!(f, "\"{}\";\"{}\";\"{}\";\"{}\"",
+            write!(f, "\"{}\";\"{}\";\"{}\";\"{}\"",
                 escape(&self.scanner_name),
                 escape(&self.rule_name),
                 escape(&self.found_in_file),
                 escape(&self.details)
             )
         } else {
-            writeln!(f, "\"{}\";\"{}\";\"{}\";\"\"",
+            write!(f, "\"{}\";\"{}\";\"{}\";\"\"",
                 escape(&self.scanner_name),
                 escape(&self.rule_name),
                 escape(&self.found_in_file)
@@ -44,7 +44,7 @@ impl Display for CsvLine {
 }
 
 pub trait ScannerFinding: Send + Sync {
-    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &PathBuf) -> std::fmt::Result;
+    fn format_readable(&self, file: &str, show_details: bool) -> Vec<String>;
     fn format_csv(&self, file: &str) -> HashSet<CsvLine>;
 }
 
@@ -67,19 +67,29 @@ impl ScannerResult {
     }
 
     pub (crate) fn display(&self, cli: &Cli) -> String {
-        let mut lines = HashSet::new();
+        let mut unique_lines = HashSet::new();
+        let mut lines = Vec::new();
         let filename = escape(self.filename());
         for finding in self.findings.iter() {
-            lines.extend(
-                finding.format_csv(&filename).iter().map(|csv| if cli.print_strings {
-                    format!("{:#}", csv)
-                } else {
-                    format!("{}", csv)
-                })
-            );
+            match cli.output_format {
+                crate::dionysos::OutputFormat::CSV => {
+                    unique_lines.extend(
+                        finding.format_csv(&filename).iter().map(|csv| if cli.print_strings {
+                            format!("{:#}", csv)
+                        } else {
+                            format!("{}", csv)
+                        })
+                    );
+                },
+                crate::dionysos::OutputFormat::TXT => {
+                    lines.extend(
+                        finding.format_readable( &filename, cli.print_strings)
+                    );
+                }
+            }
         }
-        let lines: Vec<String> = lines.into_iter().collect();
-        lines.join("")
+        lines.extend(unique_lines);
+        lines.join("\n")
     }
 }
 

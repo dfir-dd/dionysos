@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use clap::Parser;
+use clap::{Parser, ArgEnum};
 use walkdir::WalkDir;
 use std::fs::{OpenOptions};
 use std::path::{PathBuf};
@@ -16,6 +16,12 @@ use crate::yara::YaraScanner;
 use crate::filename_scanner::FilenameScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
 use crate::hash_scanner::HashScanner;
+
+#[derive(ArgEnum, Clone)]
+pub(crate) enum OutputFormat {
+    CSV,
+    TXT
+}
 
 #[derive(Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
@@ -84,6 +90,10 @@ pub (crate) struct Cli {
     /// display a progress bar (requires counting the number of files to be scanned before a progress bar can be displayed)
     #[clap(long("progress"))]
     pub(crate) display_progress: bool,
+
+    /// output format
+    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::TXT)]
+    pub(crate) output_format: OutputFormat
 }
 
 pub struct Dionysos {
@@ -212,7 +222,7 @@ impl Dionysos {
                     }
                     Ok(result) => {
                         if result.has_findings() {
-                            print!("{}", result.display(&cli));
+                            println!("{}", result.display(&cli));
                         }
                     }
                 }

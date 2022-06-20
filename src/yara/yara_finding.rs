@@ -34,8 +34,31 @@ impl YaraFinding {
 
 
 impl ScannerFinding for YaraFinding {
-    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &std::path::PathBuf) -> std::fmt::Result {
-        todo!()
+    fn format_readable(&self, file: &str, show_details: bool) -> Vec<String> {
+        let mut lines = Vec::new();
+        
+        lines.push(format!("Yara: {} {}", self.identifier, file));
+
+        if show_details {
+            for s in self.strings.iter() {
+                if s.matches.is_empty() {
+                    match &self.value_data {
+                        None => lines.push(format!("  {} matches", s.identifier)),
+                        Some(d) => lines.push(format!("  '{}' matches to {}", d,s.identifier)),
+                    }
+                } else {
+                    match &self.value_data {
+                        None => lines.push(format!("  {} has the following matches:", s.identifier)),
+                        Some(d) => lines.push(format!("  {} has the following matches in '{}':", s.identifier, d))
+                    }
+                
+                    for m in s.matches.iter() {
+                        lines.push(format!("    0x{:08x}: {}", m.offset, escape_vec(&m.data)));
+                    }
+                }
+            }
+        } 
+        lines
     }
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {

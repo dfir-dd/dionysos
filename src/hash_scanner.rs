@@ -158,8 +158,10 @@ struct HashScannerFinding {
 }
 
 impl ScannerFinding for HashScannerFinding {
-    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &std::path::PathBuf) -> std::fmt::Result {
-        todo!()
+    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
+        vec![
+            format!("file {} has the hash value {}", file, self.hash)
+        ]
     }
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {

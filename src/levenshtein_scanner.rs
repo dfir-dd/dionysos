@@ -69,8 +69,10 @@ struct LevenshteinScannerFinding {
 }
 
 impl ScannerFinding for LevenshteinScannerFinding {
-    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &std::path::PathBuf) -> std::fmt::Result {
-        todo!()
+    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
+        vec![
+            format!("the name of the file {} is very similar to {}", file, self.file_name)
+        ]
     }
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {

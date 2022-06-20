@@ -30,22 +30,35 @@ impl FileScanner for FilenameScanner
     fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         let file = file.path();
         let filename = file.to_str().unwrap();
-        self.patterns
-            .iter()
-            .filter(|p|p.is_match(&filename))
-            .map(|r|Ok(Box::new(FilenameFinding{filename: r.to_string()}) as Box<dyn ScannerFinding>))
-            .collect()
+        let mut results = Vec::new();
+        for pattern in self.patterns.iter() {
+            if pattern.is_match(&filename) {
+                results.push(
+                    Ok(
+                        Box::new(
+                            FilenameFinding{
+                                filename: filename.to_owned(),
+                                pattern: pattern.clone()
+                            }
+                        ) as Box<dyn ScannerFinding>
+                    )
+                )
+            }
+        }
+        results
     }
 }
 
-
 struct FilenameFinding {
     filename: String,
+    pattern: regex::Regex,
 }
 
 impl ScannerFinding for FilenameFinding {
-    fn format_readable(&self, f: &mut std::fmt::Formatter, file: &std::path::PathBuf) -> std::fmt::Result {
-        todo!()
+    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
+        vec![
+            format!("the name of '{}' matches the pattern /{}/", file, self.pattern)
+        ]
     }
 
     fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
