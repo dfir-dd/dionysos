@@ -8,6 +8,16 @@ sudo apt install libyara-dev
 cargo install dionysos
 ```
 
+# Features 
+
+| Feature | Details |
+|-|-|
+|Scanners | filenames (by regular expressions), similar filenames (Levenshtein), yara, hashes|
+| Output formats | human-readable text (txt), comma-separated values (csv), JavaScript Object Notation (JSON), can be selected with `--format <txt\|csv\|json>` |
+| Scan of compressed files | yara-scan of gz and bz2 compressed files is supported; see `-C` switch. Be aware that files are decompressed into a decompression buffer, and that every thread gets its own decompression buffer. You should make sure that you have sufficient memory. If you need larger buffers, you can limit the number of threads using `--threads` |
+| Special features | yara-scan in Windows evtx files and Windows registry hives using `--evtx` and `--reg`|
+
+
 # Usage
 ```
 dionysos 0.11.0
@@ -86,19 +96,47 @@ OPTIONS:
 
 ## How to add scanners
 
-### 1. Declare scanner result type
+### 1. Implement a special result type for the scanner
 
-You should enhance the class `ScannerFinding` in [src/scanner_result.rs](src/scanner_result.rs).
+For example, say we want to scan for files whose name match a regular expression. Our finding type could look like this:
+
+```rust
+struct FilenameFinding {
+    filename: String,
+    pattern: regex::Regex,
+}
+```
+
+Every finding type needs to implement `Display` and `ScannerFinding`:
+
+```rust
+impl ScannerFinding for FilenameFinding {
+
+    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
+        vec![
+            format!("the name of '{}' matches the pattern /{}/", file, self.pattern)
+        ]
+    }
+
+    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<crate::scanner_result::CsvLine> {
+        hashset![CsvLine::new("Filename", &self.filename, file, String::new())]
+    }
+
+    fn to_json(&self, file: &str) -> serde_json::Value {
+        json!({
+            "01_scanner": "filename",
+            "02_suspicious_file": file,
+            "03_pattern": format!("{}", self.pattern)
+        })
+    }
+}
+```
 
 ### 2. Implementation of the scanner
 
 Take, for example, the `FilenameScanner`, which tries to do a simple filename match:
 
 ```rust
-use crate::filescanner::*;
-use crate::scanner_result::{ScannerFinding};
-use walkdir::DirEntry;
-
 pub struct FilenameScanner {
     patterns: Vec<regex::Regex>,
 }
@@ -111,15 +149,33 @@ impl FilenameScanner {
     }
 }
 
+impl Display for FilenameScanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "FilenameScanner")
+    }
+}
+
 impl FileScanner for FilenameScanner
 {
-    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<ScannerFinding>> {
-        let filename = file.path().to_str().unwrap();
-        self.patterns
-            .iter()
-            .filter(|p|p.is_match(&filename))
-            .map(|r|Ok(ScannerFinding::Filename(r.to_string())))
-            .collect()
+    fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
+        let file = file.path();
+        let filename = file.to_str().unwrap();
+        let mut results = Vec::new();
+        for pattern in self.patterns.iter() {
+            if pattern.is_match(&filename) {
+                results.push(
+                    Ok(
+                        Box::new(
+                            FilenameFinding{
+                                filename: filename.to_owned(),
+                                pattern: pattern.clone()
+                            }
+                        ) as Box<dyn ScannerFinding>
+                    )
+                )
+            }
+        }
+        results
     }
 }
 ```
