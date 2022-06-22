@@ -1,8 +1,9 @@
 #!/bin/bash
 
-echo "updating Rust build environment"
+echo "updating Rust build toolchain"
 echo "============================================"
 rustup update stable
+rustup default stable
 rustup show
 echo "============================================"
 
