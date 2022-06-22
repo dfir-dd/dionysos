@@ -20,14 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@master
 
-      - name: Install required packages
-        run: sudo apt-get install -y libyara-dev
-
-
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          PRE_BUILD: build/pre.sh
           RUSTTARGET: ${{ matrix.target }}
           ARCHIVE_TYPES: ${{ matrix.archive }}

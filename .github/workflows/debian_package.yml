@@ -9,9 +9,6 @@ jobs:
     steps:
     - uses: actions/checkout@master
   
-    - name: Install required packages
-      run: sudo apt-get install -y libyara-dev    
-
     - name: Set env
       run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
     - name: Test
@@ -30,6 +27,8 @@ jobs:
     
     - name: build x86_64-unknown-linux-musl
       uses: ebbflow-io/cargo-deb-amd64-ubuntu@1.0
+      with:
+        cmd: apt-get install -y libyara-dev; cargo deb --target=x86_64-unknown-linux-musl
       
     - name: Upload Release Asset
       id: upload-debfile 
