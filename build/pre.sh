@@ -2,11 +2,11 @@
 
 echo "updating package metadata"
 echo "============================================"
-apt update
+apt-get update
 echo "============================================"
 
 echo "installing missing packages"
-if [-f /etc/alpine-release ]; then
+if [ -f /etc/alpine-release ]; then
     apt-get install clang-static
 else
     apt-get install -y libyara-dev clang
