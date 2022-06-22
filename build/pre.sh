@@ -14,5 +14,5 @@ apt update
 echo "============================================"
 
 echo "installing missing packages"
-apt-get install -y libyara-dev libclang-dev
+apt-get install -y libyara-dev clang
 echo "============================================"
