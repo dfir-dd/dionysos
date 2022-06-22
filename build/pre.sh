@@ -11,7 +11,7 @@ echo "============================================"
 
 echo "installing missing packages"
 if [ -f /etc/alpine-release ]; then
-    apk add clang-static
+    apk add clang-static yara-dev clang-dev
 else
     apt-get install -y libyara-dev clang
 fi
