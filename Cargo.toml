@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "0.11.2"
+version = "0.11.3"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
@@ -17,6 +17,10 @@ default = ["scan_evtx", "scan_reg"]
 scan_evtx = ["evtx"]
 scan_reg = ["nt_hive2", "binread"]
 
+[package.metadata.deb]
+license-file = "LICENSE"
+depends = "libyara (>=4.2.1), file"
+
 [dependencies]
 anyhow = "1.0"
 clap = {version="3", features=["derive"]}
@@ -24,7 +28,7 @@ clap-verbosity-flag = {version="1.0.0"}
 simplelog = "0.12"
 log = "0.4"
 walkdir = "2"
-yara = "0"
+yara = "0.12"
 zip = "0.5"
 regex = "1.5"
 indicatif = "0.17.0-rc.11"
