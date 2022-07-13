@@ -1,5 +1,5 @@
 
-use std::fmt::Display;
+use std::{fmt::Display, error::Error};
 
 use yara::YaraError;
 
@@ -7,7 +7,6 @@ use yara::YaraError;
 use evtx::err::EvtxError;
 
 //#[cfg(feature="reg")]
-
 pub (crate) enum YaraScannerError {
     Yara(YaraError),
 

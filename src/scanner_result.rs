@@ -13,13 +13,13 @@ pub trait ScannerFinding: Send + Sync {
 }
 
 pub struct ScannerResult {
-    filename: PathBuf,
+    filename: String,
     findings: Vec<Box<dyn ScannerFinding>>
 }
 
 impl ScannerResult {
     pub fn filename(&self) -> &str {
-        self.filename.to_str().as_ref().unwrap()
+        &self.filename[..]
     }
 
     pub fn add_finding(&mut self, finding: Box<dyn ScannerFinding>) {
@@ -65,7 +65,16 @@ impl ScannerResult {
 impl From<&Path> for ScannerResult {
     fn from(path: &Path) -> Self {
         Self {
-            filename: path.to_owned(),
+            filename: path.to_string_lossy().to_string(),
+            findings: Vec::new()
+        }
+    }
+}
+
+impl From<String> for ScannerResult {
+    fn from(filename: String) -> Self {
+        Self {
+            filename: filename,
             findings: Vec::new()
         }
     }

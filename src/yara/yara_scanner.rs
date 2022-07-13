@@ -46,6 +46,7 @@ enum FileType {
     GZip,
     BZip2,
     XZ,
+    Zip,
     Evtx,
     Reg,
     Uncompressed
@@ -101,61 +102,6 @@ impl FileScanner for YaraScanner
             externals.with_owner("-".to_owned())
         };
 
-        // check if the file is a compressed file
-        let file_type = 
-        if self.scan_compressed {
-
-            if let Some(m) = &magic {
-                if m == "XZ compressed data"                         {FileType::XZ}
-                else if m.starts_with("gzip compressed data")        {FileType::GZip}
-                else if m.starts_with("bzip2 compressed data")       {FileType::BZip2}
-                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
-                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
-                else {
-                    if m.contains("compressed data") {
-                        log::warn!("unknown compression format: '{}', file will be handled without decompression", m);
-                    }
-                    FileType::Uncompressed
-                }
-            } else {
-                FileType::Uncompressed
-            }
-        } else {
-            if let Some(m) = &magic {
-                if m.contains("compressed data") {
-                    log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
-                    FileType::Uncompressed
-                }
-                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
-                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
-                else {
-                    FileType::Uncompressed
-                }
-            } else {
-                FileType::Uncompressed}
-        };
-
-        let decompression_result = match file_type {
-            FileType::GZip => self.read_into_buffer(GzDecoder::new(File::open(file).unwrap())),
-            FileType::BZip2 => self.read_into_buffer(BzDecoder::new(File::open(file).unwrap())),
-            FileType::XZ => self.read_into_buffer(XzDecoder::new(File::open(file).unwrap())),
-            _ => Ok((0, vec![]))
-        };
-
-        let buffer = match decompression_result {
-            Ok((0, buffer)) => buffer, // no decompression took place
-            Err(why) => return vec![Err(anyhow!("error while decompressing a file: {:?}", why))],
-            Ok((bytes, buffer)) => {
-                if bytes == buffer.capacity() {
-                    log::warn!("file '{}' could not be decompressed completely", file.display())
-                } else {
-                    assert!(! buffer.is_empty());
-                    log::info!("uncompressed {} bytes from '{}'", bytes, file.display());
-                }
-                buffer
-            }
-        };
-
         let mut scanner = match self.rules.scanner() {
             Err(why) => return vec![Err(anyhow!("unable to create yara scanner: {:?}", why))],
             Ok(scanner) => scanner
@@ -168,37 +114,64 @@ impl FileScanner for YaraScanner
             }
         }
 
-        #[cfg(feature="scan_evtx")]
-        if self.scan_evtx && matches!(file_type, FileType::Evtx) {
-            match self.scan_evtx(&mut scanner, &file) {
-                Err(why) => return vec![Err(anyhow!("{}", why))],
-                Ok(results) => return results.into_iter().map(|r| Ok(Box::new(r) as Box<dyn ScannerFinding>)).collect(),
-            }
-        }
-        
-        #[cfg(feature="scan_reg")]
-        if self.scan_reg && matches!(file_type, FileType::Reg) {
+        // check if the file is a compressed file and must be decompressed before scanning
+        let file_type = self.get_filetype(magic, file);
 
-            let hive_file = File::open(file).unwrap();
-            let hive = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
-                Ok(hive) => hive,
-                Err(why) => return vec![Err(anyhow!("{}", why))]
-            };
+        let scan_result =
+        match file_type {
+            
+            FileType::GZip => self.scan_compressed(&mut scanner, 
+                GzDecoder::new(File::open(file).unwrap()),
+                &file.display().to_string()),
+            
+            FileType::BZip2 => self.scan_compressed(&mut scanner, 
+                BzDecoder::new(File::open(file).unwrap()),
+                &file.display().to_string()),
+            
+            FileType::XZ => self.scan_compressed(&mut scanner, 
+                XzDecoder::new(File::open(file).unwrap()),
+                &file.display().to_string()),
+            
+            FileType::Zip => self.scan_zip_archive(scanner, File::open(file).unwrap(), &file.to_string_lossy()),
 
-            if hive.is_primary_file() {
-                log::trace!("scanning for IOCs inside registry hive file '{}'", file.display());
-
-                match self.scan_reg(&mut scanner, hive) {
-                    Err(why) => return vec![Err(anyhow!("{}", why))],
-                    Ok(results) => return results.into_iter().map(|r| Ok(Box::new(r) as Box<dyn ScannerFinding>)).collect(),
+            FileType::Evtx => {
+                #[cfg(feature="scan_evtx")]
+                if self.scan_evtx {
+                    self.scan_evtx(&mut scanner, &file)
+                } else {
+                    self.scan_file(&mut scanner, &file)
                 }
-            } else {
-                log::trace!("'{}' is no primary hive file, using the normal yara scanner", file.display());
+
+                #[cfg(not(feature="scan_evtx"))]
+                scanner.scan_file(&file).or_else(|e| Err(anyhow!(e)))
             }
-        }
-        let scan_result = match buffer.is_empty() {
-            true => scanner.scan_file(&file),
-            false => scanner.scan_mem(&buffer).or_else(|e| Err(yara::Error::Yara(e))),
+
+            FileType::Reg => {
+                #[cfg(feature="scan_reg")]
+                if self.scan_evtx && matches!(file_type, FileType::Evtx) {
+
+                    let hive_file = File::open(file).unwrap();
+                    let hive = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
+                        Ok(hive) => hive,
+                        Err(why) => return vec![Err(anyhow!("{}", why))]
+                    };
+        
+                    if hive.is_primary_file() {
+                        log::trace!("scanning for IOCs inside registry hive file '{}'", file.display());
+        
+                        self.scan_reg(&mut scanner, hive)
+                    } else {
+                        log::trace!("'{}' is no primary hive file, using the normal yara scanner", file.display());
+                        self.scan_file(&mut scanner, &file)
+                    }
+                } else {
+                    self.scan_file(&mut scanner, &file)
+                }
+
+                #[cfg(not(feature="scan_reg"))]
+                scanner.scan_file(&file).or_else(|e| Err(anyhow!(e)))
+            }
+            FileType::Uncompressed => self.scan_file(&mut scanner, &file),
         };
 
 
@@ -215,6 +188,7 @@ impl FileScanner for YaraScanner
                 ));
             }
         }
+        
         results
     }
 }
@@ -392,7 +366,7 @@ impl YaraScanner {
     }
 
     #[cfg(feature="scan_evtx")]
-    fn scan_evtx<'a>(&self, scanner: &'a mut yara::Scanner, file: &Path) -> Result<Vec<YaraFinding>, YaraScannerError> {
+    fn scan_evtx<'a>(&self, scanner: &'a mut yara::Scanner, file: &Path) -> anyhow::Result<Vec<YaraFinding>> {
         log::trace!("scanning for IOCs inside evtx file '{}'", file.display());
 
         let mut results = Vec::new();
@@ -410,7 +384,7 @@ impl YaraScanner {
     }
 
     #[cfg(feature="scan_evtx")]
-    fn scan_json<'a>(scanner: &'a mut yara::Scanner, val: &Value) -> Result<Vec<YaraFinding>, YaraScannerError> {
+    fn scan_json<'a>(scanner: &'a mut yara::Scanner, val: &Value) -> anyhow::Result<Vec<YaraFinding>> {
         let mut results = Vec::new();
         match val {
             Value::Null => Ok(vec![]),
@@ -436,7 +410,7 @@ impl YaraScanner {
     }
 
     #[cfg(feature="scan_evtx")]
-    fn scan_string<'a>(scanner: &'a mut yara::Scanner, s: &String) -> Result<Vec<YaraFinding>, YaraScannerError> {
+    fn scan_string<'a>(scanner: &'a mut yara::Scanner, s: &String) -> Result<Vec<YaraFinding>, yara::YaraError> {
         match scanner.scan_mem(s.as_bytes()) {
             Err(why) => return Err(why.into()),
             Ok(r) => {
@@ -447,14 +421,16 @@ impl YaraScanner {
 
 
     #[cfg(feature="scan_reg")]
-    fn scan_reg<'a>(&self, scanner: &'a mut yara::Scanner, mut hive: Hive<File>) -> Result<Vec<YaraFinding>, YaraScannerError> {
+    fn scan_reg<'a>(&self, scanner: &'a mut yara::Scanner, mut hive: Hive<File>) -> anyhow::Result<Vec<YaraFinding>> {
         let root_key = hive.root_key_node()?;
 
-        let res = Self::scan_key(scanner, &mut hive, &root_key, String::new())?;
-        Ok(res)
+        match Self::scan_key(scanner, &mut hive, &root_key, String::new()) {
+            Err(why) => Err(why.into()),
+            Ok(results) => Ok(results)
+        }
     }
 
-    fn scan_key<'a>(scanner: &'a mut yara::Scanner, hive: &mut Hive<File>, key: &KeyNode, path: String) -> Result<Vec<YaraFinding>, YaraScannerError> {
+    fn scan_key<'a>(scanner: &'a mut yara::Scanner, hive: &mut Hive<File>, key: &KeyNode, path: String) -> anyhow::Result<Vec<YaraFinding>> {
         let mut results = Vec::new();
         for v in key.values() {
             match v.value() {
@@ -487,6 +463,90 @@ impl YaraScanner {
 
     fn key_display(path: &str, attr_name: &str, attr_value: &str) -> String {
         format!("{}/@{} = '{}'", path, attr_name, attr_value)
+    }
+
+
+    fn get_filetype(&self, magic: Option<String>, file: &Path) -> FileType {
+        let file_type = 
+        if self.scan_compressed {
+
+            if let Some(m) = &magic {
+                if m == "XZ compressed data"                         {FileType::XZ}
+                else if m.starts_with("gzip compressed data")        {FileType::GZip}
+                else if m.starts_with("bzip2 compressed data")       {FileType::BZip2}
+                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
+                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
+                else if m.starts_with("Zip archive data")            {FileType::Zip}
+                else {
+                    if m.contains("compressed data") {
+                        log::warn!("unknown compression format: '{}', file will be handled without decompression", m);
+                    }
+                    FileType::Uncompressed
+                }
+            } else {
+                FileType::Uncompressed
+            }
+        } else {
+            if let Some(m) = &magic {
+                if m.contains("compressed data") || m.contains("archive data") {
+                    log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
+                    FileType::Uncompressed
+                }
+                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
+                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
+                else {
+                    FileType::Uncompressed
+                }
+            } else {
+                FileType::Uncompressed}
+        };
+        file_type
+    }
+
+    fn scan_file(&self, scanner: &mut yara::Scanner<'_>, file: &Path) -> anyhow::Result<Vec<YaraFinding>> {
+        match scanner.scan_file(file) {
+            Err(why) => Err(why.into()),
+            Ok(results) => Ok(results.into_iter().map(|r| YaraFinding::from(r)).collect())
+        }
+    }
+
+    fn scan_compressed<'a, R:Read>(&self, scanner: &mut yara::Scanner, reader: R, file_display_name: &str) -> anyhow::Result<Vec<YaraFinding>> {
+        let (bytes, buffer) = self.read_into_buffer(reader)?;
+
+        if bytes == buffer.capacity() {
+            log::warn!("file '{file_display_name}' could not be decompressed completely")
+        } else {
+            assert!(! buffer.is_empty());
+            log::info!("uncompressed {bytes} bytes from '{file_display_name}'");
+        }
+
+        match scanner.scan_mem(&buffer){
+            Err(why) => Err(why.into()),
+            Ok(results) => Ok(results.into_iter().map(|r| YaraFinding::from(r)).collect())
+        }
+    }
+
+    fn scan_zip_archive(&self, mut scanner: yara::Scanner, reader: File, zip_name: &str) -> anyhow::Result<Vec<YaraFinding>> {
+        let mut results = Vec::new();
+
+        if let Ok(mut zip) = zip::ZipArchive::new(reader) {
+            for i in 0..zip.len() {
+                let file = zip.by_index(i)?;
+                if file.is_file() {
+                    let filename = file.name().to_owned();
+                    let display_name = format!("{zip_name}:{filename}");
+                    scanner.define_variable("filename", &filename[..])?;
+
+                    match self.scan_compressed(&mut scanner, file, &display_name) {
+                        Ok(res) => {
+                            results.extend(res.into_iter().map(|r| r.with_contained_file(&filename)));
+                        }
+                        Err(why) => return Err(why.into()),
+                    }
+                }
+            }
+        }
+        Ok(results)
     }
 }
 

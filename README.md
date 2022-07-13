@@ -20,7 +20,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.11.4
+dionysos 0.12.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -69,7 +69,7 @@ OPTIONS:
             progress bar can be displayed)
 
     -C, --scan-compressed
-            allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
+            allow yara to scan compressed files. Currently, zip, xz, bz2 and gz are supported
 
         --decompression-buffer <DECOMPRESSION_BUFFER_SIZE>
             maximum size (in MiB) of decompression buffer (per thread), which is used to scan

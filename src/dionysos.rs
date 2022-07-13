@@ -1,7 +1,8 @@
 use anyhow::{Result, anyhow};
 use clap::{Parser, ArgEnum};
 use walkdir::WalkDir;
-use std::fs::{OpenOptions};
+use std::fs::{OpenOptions, File};
+use std::io::Read;
 use std::path::{PathBuf};
 use std::{thread};
 use std::time::{Instant, Duration};
@@ -146,6 +147,7 @@ fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
                 }
 
                 let result = handle_file(&scanners, &entry);
+
                 if let Err(why) = tx.send(result) {
                     log::error!("error while sending a scanner result from the worker: {}", why);
                     if let Some(s) = mystatus {
@@ -237,6 +239,7 @@ impl Dionysos {
                 .filter_map(|e| e.ok())
                 .filter(|e| e.file_type().is_file()) {
             log::info!("scanning '{}'", entry.path().display());
+
             tx_in.send(entry)?;
         }
         drop(tx_in);

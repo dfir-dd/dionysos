@@ -13,7 +13,8 @@ pub struct YaraFinding {
     //pub metadatas: Vec<Metadata<'r>>,
     pub tags: Vec<String>,
     pub strings: Vec<YaraString>,
-    pub value_data: Option<String>
+    pub value_data: Option<String>,
+    pub contained_file: Option<String>
 }
 
 impl From<yara::Rule<'_>> for YaraFinding {
@@ -23,14 +24,21 @@ impl From<yara::Rule<'_>> for YaraFinding {
             namespace: rule.namespace.to_owned(),
             tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
             strings: rule.strings.into_iter().map(|s| s.into()).collect(),
-            value_data: None
+            value_data: None,
+            contained_file: None,
         }
     }
 }
 
 impl YaraFinding {
+    
     pub fn with_value_data(mut self, data: String) -> Self {
         self.value_data = Some(data);
+        self
+    }
+
+    pub fn with_contained_file(mut self, file: &str) -> Self {
+        self.contained_file = Some(file.to_owned());
         self
     }
 }
@@ -114,7 +122,8 @@ impl ScannerFinding for YaraFinding {
                         "data": escape_vec(&m.data)
                     })).collect::<Vec<Value>>()
                 })
-            }).collect::<Vec<Value>>()
+            }).collect::<Vec<Value>>(),
+            "05_contained_file": self.contained_file
         })
     }
 }
