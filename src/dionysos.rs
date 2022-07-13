@@ -30,71 +30,72 @@ pub (crate) struct Cli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
     
-    /// regular expression to match against the basename of files.
-    /// This parameter can be specified multiple times
-    #[clap(short('F'), long("filename"))]
-    filenames: Vec<String>,
-
-    /// do not run the Levenshtein scanner
-    #[clap(long("omit-levenshtein"))]
-    omit_levenshtein: bool,
-
     /// path which must be scanned
-    #[clap(short('P'), long("path"))]
+    #[clap(short('P'), long("path"), display_order(10))]
     path: Option<String>,
+
+    /// output format
+    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::TXT, display_order(20))]
+    pub(crate) output_format: OutputFormat,
 
     /// use yara scanner with the specified ruleset. This can be a
     /// single file, a zip file or a directory containing lots of
     /// yara files. Yara files must end with 'yar' or 'yara', and zip
     /// files must end with 'zip'
-    #[clap(short('Y'), long("yara"))]
+    #[clap(short('Y'), long("yara"), display_order(100))]
     yara: Option<String>,
 
-    /// allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
-    #[clap(short('C'), long("scan-compressed"))]
-    scan_compressed: bool,
-
-    /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
-    #[clap(long("decompression-buffer"), default_value_t=128)]
-    decompression_buffer_size: usize,
-
-    /// path of the file to write logs to. Logs will always be appended
-    #[clap(short('L'), long("log-file"))]
-    log_file: Option<String>,
-
-    /// Hash of file to match against. Use any of MD5, SHA1 or SHA256
-    #[clap(short('H'), long("file-hash"))]
-    file_hash: Vec<String>,
-
     /// timeout for the yara scanner, in seconds
-    #[clap(long("yara-timeout"), default_value_t=240)]
+    #[clap(long("yara-timeout"), default_value_t=240, display_order(110))]
     yara_timeout: u16,
 
     /// print matching strings (only used by yara currently)
-    #[clap(short('s'), long("print-strings"))]
+    #[clap(short('s'), long("print-strings"), display_order(120))]
     pub (crate) print_strings: bool,
 
-    /// use the specified NUMBER of threads
-    #[clap(short('p'), long("threads"), default_value_t = num_cpus::get())]
-    threads: usize,
-
     /// also do YARA scan in Windows EVTX records (exported as JSON)
-    #[clap(long("evtx"))]
+    #[clap(long("evtx"), display_order(130))]
     #[cfg(feature="scan_evtx")]
     pub (crate) yara_scan_evtx: bool,
 
     /// also do YARA scan in Windows registry hive files
-    #[clap(long("reg"))]
+    #[clap(long("reg"), display_order(130))]
     #[cfg(feature="scan_reg")]
     pub (crate) yara_scan_reg: bool,
 
+
+    /// Hash of file to match against. Use any of MD5, SHA1 or SHA256
+    #[clap(short('H'), long("file-hash"), display_order(200))]
+    file_hash: Vec<String>,
+
+    /// regular expression to match against the basename of files.
+    /// This parameter can be specified multiple times
+    #[clap(short('F'), long("filename"), display_order(210))]
+    filenames: Vec<String>,
+
+    /// do not run the Levenshtein scanner
+    #[clap(long("omit-levenshtein"), display_order(220))]
+    omit_levenshtein: bool,
+
+    /// use the specified NUMBER of threads
+    #[clap(short('p'), long("threads"), default_value_t = num_cpus::get(), display_order(300))]
+    threads: usize,
+
     /// display a progress bar (requires counting the number of files to be scanned before a progress bar can be displayed)
-    #[clap(long("progress"))]
+    #[clap(long("progress"), display_order(310))]
     pub(crate) display_progress: bool,
 
-    /// output format
-    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::TXT)]
-    pub(crate) output_format: OutputFormat
+    /// allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
+    #[clap(short('C'), long("scan-compressed"), display_order(500))]
+    scan_compressed: bool,
+
+    /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
+    #[clap(long("decompression-buffer"), default_value_t=128, display_order(510))]
+    decompression_buffer_size: usize,
+
+    /// path of the file to write logs to. Logs will always be appended
+    #[clap(short('L'), long("log-file"), display_order(520))]
+    log_file: Option<String>,
 }
 
 pub struct Dionysos {
