@@ -20,7 +20,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 1.0.0
+dionysos 1.0.1
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
