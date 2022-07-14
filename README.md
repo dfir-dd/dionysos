@@ -20,7 +20,7 @@ cargo install dionysos
 
 # Usage
 ```
-dionysos 0.12.0
+dionysos 1.0.0
 Jan Starke <Jan.Starke@t-systems.com>
 Scanner for various IoCs
 
@@ -51,15 +51,23 @@ OPTIONS:
         --reg
             also do YARA scan in Windows registry hive files
 
+    -C, --scan-compressed
+            allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
+
+        --decompression-buffer <DECOMPRESSION_BUFFER_SIZE>
+            maximum size (in MiB) of decompression buffer (per thread), which is used to scan
+            compressed files [default: 128]
+
     -H, --file-hash <FILE_HASH>
-            Hash of file to match against. Use any of MD5, SHA1 or SHA256
+            Hash of file to match against. Use any of MD5, SHA1 or SHA256. This parameter can be
+            specified multiple times
 
     -F, --filename <FILENAMES>
             regular expression to match against the basename of files. This parameter can be
             specified multiple times
 
-        --omit-levenshtein
-            do not run the Levenshtein scanner
+        --levenshtein
+            run the Levenshtein scanner
 
     -p, --threads <THREADS>
             use the specified NUMBER of threads [default: 16]
@@ -67,13 +75,6 @@ OPTIONS:
         --progress
             display a progress bar (requires counting the number of files to be scanned before a
             progress bar can be displayed)
-
-    -C, --scan-compressed
-            allow yara to scan compressed files. Currently, zip, xz, bz2 and gz are supported
-
-        --decompression-buffer <DECOMPRESSION_BUFFER_SIZE>
-            maximum size (in MiB) of decompression buffer (per thread), which is used to scan
-            compressed files [default: 128]
 
     -L, --log-file <LOG_FILE>
             path of the file to write logs to. Logs will always be appended
