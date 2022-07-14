@@ -1,3 +1,8 @@
+![Crates.io](https://img.shields.io/crates/v/dionysos)
+![Crates.io](https://img.shields.io/crates/l/dionysos)
+![Crates.io (latest)](https://img.shields.io/crates/dv/dionysos)
+
+
 # `dionysos`
 Scanner for various IoCs
 
