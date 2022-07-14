@@ -23,7 +23,7 @@ impl FilenameScanner {
 
 impl Display for FilenameScanner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "FilenameScanner")
+        write!(f, "FilenameScanner")
     }
 }
 
@@ -34,7 +34,7 @@ impl FileScanner for FilenameScanner
         let filename = file.to_str().unwrap();
         let mut results = Vec::new();
         for pattern in self.patterns.iter() {
-            if pattern.is_match(&filename) {
+            if pattern.is_match(filename) {
                 results.push(
                     Ok(
                         Box::new(
@@ -61,7 +61,7 @@ impl ScannerFinding for FilenameFinding {
         ]
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
+    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
         hashset![CsvLine::new("Filename", &format!("{}", self.pattern), file, String::new())]
     }
     fn to_json(&self, file: &str) -> serde_json::Value {

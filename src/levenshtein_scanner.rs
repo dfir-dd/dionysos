@@ -14,7 +14,7 @@ pub struct LevenshteinScanner {
 
 impl Default for LevenshteinScanner {
     fn default() -> Self {
-        static WELLKNOWN_FILES: [&'static str; 8] = [
+        static WELLKNOWN_FILES: [&str; 8] = [
             "svchost.exe",
             "explorer.exe",
             "iexplore.exe",
@@ -39,7 +39,7 @@ impl FileScanner for LevenshteinScanner {
 
 impl Display for LevenshteinScanner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "LevenshteinScanner")
+        write!(f, "LevenshteinScanner")
     }
 }
 
@@ -77,8 +77,8 @@ impl ScannerFinding for LevenshteinScannerFinding {
         ]
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
-        hashset![CsvLine::new("Levenshtein", &format!("{}", &self.file_name), file, String::new())]
+    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
+        hashset![CsvLine::new("Levenshtein", &self.file_name, file, String::new())]
     }
 
     fn to_json(&self, file: &str) -> serde_json::Value {
@@ -126,10 +126,8 @@ pub fn has_levenshtein_distance_one(a: &Vec<char>, b: &Vec<char>) -> bool {
         if length_a - length_b > 1 {
             return false;
         }
-    } else {
-        if length_b - length_a > 1 {
-            return false;
-        }
+    } else if length_b - length_a > 1 {
+        return false;
     }
 
     /* Initialize the vector.
@@ -203,7 +201,7 @@ mod tests {
             match results.last() {
                 None => assert!(results.is_empty(), "invalid result for {}", filename),
                 Some(result) => match result {
-                    Err(why) => assert!(false, "error in scan_result: {:?}", why),
+                    Err(why) => panic!("error in scan_result: {:?}", why),
                     Ok(_) => ()
                 }
             }

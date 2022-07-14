@@ -36,7 +36,7 @@ impl ScannerResult {
         let filename = escape(self.filename());
         for finding in self.findings.iter() {
             match cli.output_format {
-                crate::dionysos::OutputFormat::CSV => {
+                crate::dionysos::OutputFormat::Csv => {
                     unique_lines.extend(
                         finding.format_csv(&filename).iter().map(|csv| if cli.print_strings {
                             format!("{:#}", csv)
@@ -45,12 +45,12 @@ impl ScannerResult {
                         })
                     );
                 },
-                crate::dionysos::OutputFormat::TXT => {
+                crate::dionysos::OutputFormat::Txt => {
                     lines.extend(
                         finding.format_readable( &filename, cli.print_strings)
                     );
                 },
-                crate::dionysos::OutputFormat::JSON => {
+                crate::dionysos::OutputFormat::Json => {
                     lines.push(
                         finding.to_json(&filename).to_string()
                     )
@@ -74,7 +74,7 @@ impl From<&Path> for ScannerResult {
 impl From<String> for ScannerResult {
     fn from(filename: String) -> Self {
         Self {
-            filename: filename,
+            filename,
             findings: Vec::new()
         }
     }

@@ -17,12 +17,12 @@ impl YaraExternals {
     pub fn to_hashmap(&self) -> HashMap<&str, &str> {
         let mut res = HashMap::new();
 
-        if let Some(x) = &self.filename  { res.insert("filename",  (&x).as_str());}
-        if let Some(x) = &self.filepath  { res.insert("filepath",  (&x).as_str());}
-        if let Some(x) = &self.extension { res.insert("extension", (&x).as_str());}
-        if let Some(x) = &self.filetype  { res.insert("filetype",  (&x).as_str());}
-        if let Some(x) = &self.md5       { res.insert("md5",       (&x).as_str());}
-        if let Some(x) = &self.owner     { res.insert("owner",     (&x).as_str());}
+        if let Some(x) = &self.filename  { res.insert("filename",  x.as_str());}
+        if let Some(x) = &self.filepath  { res.insert("filepath",  x.as_str());}
+        if let Some(x) = &self.extension { res.insert("extension", x.as_str());}
+        if let Some(x) = &self.filetype  { res.insert("filetype",  x.as_str());}
+        if let Some(x) = &self.md5       { res.insert("md5",       x.as_str());}
+        if let Some(x) = &self.owner     { res.insert("owner",     x.as_str());}
 
         res
     }

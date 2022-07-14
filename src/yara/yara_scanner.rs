@@ -2,7 +2,6 @@ use nt_hive2::Hive;
 use nt_hive2::HiveParseMode;
 use nt_hive2::KeyNode;
 use walkdir::DirEntry;
-use yara;
 use anyhow::{Result, anyhow};
 use crate::filescanner::*;
 use crate::scanner_result;
@@ -19,9 +18,6 @@ use filemagic::magic;
 use flate2::read::GzDecoder;
 use xz::read::XzDecoder;
 use bzip2::read::BzDecoder;
-
-#[cfg(feature="scan_evtx")]
-use evtx;
 
 #[cfg(feature="scan_evtx")]
 use serde_json::Value;
@@ -54,7 +50,7 @@ enum FileType {
 
 impl Display for YaraScanner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "YaraScanner")
+        write!(f, "YaraScanner")
     }
 }
 
@@ -84,12 +80,12 @@ impl FileScanner for YaraScanner
                 Some(f) => f.to_string_lossy().to_string(),
                 None => "-".to_owned()
             })
-            .with_filetype(magic.clone().or(Some("-".to_owned())).unwrap());
+            .with_filetype(magic.clone().unwrap_or_else(|| "-".to_owned()));
         
         externals = if cfg!(target_family = "unix") {
             externals.with_owner(match file.display().to_string().owner(){
                 Ok(owner) => match owner.name() {
-                    Ok(name) => name.or(Some(owner.id().to_string())).unwrap(),
+                    Ok(name) => name.unwrap_or_else(|| owner.id().to_string()),
                     Err(why) => {
                         log::warn!("unable to retrieve owner name: {:?}", why);
                         owner.id().to_string()
@@ -136,9 +132,9 @@ impl FileScanner for YaraScanner
             FileType::Evtx => {
                 #[cfg(feature="scan_evtx")]
                 if self.scan_evtx {
-                    self.scan_evtx(&mut scanner, &file)
+                    self.scan_evtx(&mut scanner, file)
                 } else {
-                    self.scan_file(&mut scanner, &file)
+                    self.scan_file(&mut scanner, file)
                 }
 
                 #[cfg(not(feature="scan_evtx"))]
@@ -161,16 +157,16 @@ impl FileScanner for YaraScanner
                         self.scan_reg(&mut scanner, hive)
                     } else {
                         log::trace!("'{}' is no primary hive file, using the normal yara scanner", file.display());
-                        self.scan_file(&mut scanner, &file)
+                        self.scan_file(&mut scanner, file)
                     }
                 } else {
-                    self.scan_file(&mut scanner, &file)
+                    self.scan_file(&mut scanner, file)
                 }
 
                 #[cfg(not(feature="scan_reg"))]
                 scanner.scan_file(&file).or_else(|e| Err(anyhow!(e)))
             }
-            FileType::Uncompressed => self.scan_file(&mut scanner, &file),
+            FileType::Uncompressed => self.scan_file(&mut scanner, file),
         };
 
 
@@ -183,7 +179,7 @@ impl FileScanner for YaraScanner
                     log::trace!("new yara finding: {} in '{}'",
                         scanner_result::escape(&r.identifier),
                         file.display());
-                    Ok(Box::new(YaraFinding::from(r)) as Box<dyn ScannerFinding>)}
+                    Ok(Box::new(r) as Box<dyn ScannerFinding>)}
                 ));
             }
         }
@@ -288,7 +284,7 @@ impl YaraScanner {
                             if Self::is_yara_filename(name) {
                                 // create PathBuf to let rust release all immutable borrows of `file`
                                 let file_path = file_path.to_path_buf();
-                                Self::add_rules_from_stream(rules, file_path.to_path_buf(), &mut file)?;
+                                Self::add_rules_from_stream(rules, &file_path, &mut file)?;
                             }
                         }
                         None => {
@@ -322,7 +318,7 @@ impl YaraScanner {
                 Some(v) => v,
                 None => return Err(anyhow!("unable to read filename"))
             };
-        return Ok(Self::is_yara_filename(filename));
+        Ok(Self::is_yara_filename(filename))
     }
 
     fn is_yara_filename(filename: &str) -> bool {
@@ -336,7 +332,7 @@ impl YaraScanner {
                 Some(v) => v,
                 None => return Err(anyhow!("unable to read filename"))
             };
-        return Ok(Self::is_zip_filename(filename));
+        Ok(Self::is_zip_filename(filename))
     }
 
     fn is_zip_filename(filename: &str) -> bool {
@@ -411,9 +407,9 @@ impl YaraScanner {
     #[cfg(feature="scan_evtx")]
     fn scan_string<'a>(scanner: &'a mut yara::Scanner, s: &String) -> Result<Vec<YaraFinding>, yara::YaraError> {
         match scanner.scan_mem(s.as_bytes()) {
-            Err(why) => return Err(why.into()),
+            Err(why) => Err(why),
             Ok(r) => {
-                Ok(r.into_iter().map(|rule| YaraFinding::from(rule)).collect())
+                Ok(r.into_iter().map(YaraFinding::from).collect())
             }
         }
     }
@@ -424,7 +420,7 @@ impl YaraScanner {
         let root_key = hive.root_key_node()?;
 
         match Self::scan_key(scanner, &mut hive, &root_key, String::new()) {
-            Err(why) => Err(why.into()),
+            Err(why) => Err(why),
             Ok(results) => Ok(results)
         }
     }
@@ -485,31 +481,29 @@ impl YaraScanner {
             } else {
                 FileType::Uncompressed
             }
+        } else if let Some(m) = &magic {
+            if m.contains("compressed data") || m.contains("archive data") {
+                log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
+                FileType::Uncompressed
+            }
+            else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
+            else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
+            else {
+                FileType::Uncompressed
+            }
         } else {
-            if let Some(m) = &magic {
-                if m.contains("compressed data") || m.contains("archive data") {
-                    log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
-                    FileType::Uncompressed
-                }
-                else if m.starts_with("MS Windows Vista Event Log,") {FileType::Evtx}
-                else if m.starts_with("MS Windows registry file, NT/2000 or above") {FileType::Reg}
-                else {
-                    FileType::Uncompressed
-                }
-            } else {
-                FileType::Uncompressed}
-        };
+            FileType::Uncompressed};
         file_type
     }
 
     fn scan_file(&self, scanner: &mut yara::Scanner<'_>, file: &Path) -> anyhow::Result<Vec<YaraFinding>> {
         match scanner.scan_file(file) {
             Err(why) => Err(why.into()),
-            Ok(results) => Ok(results.into_iter().map(|r| YaraFinding::from(r)).collect())
+            Ok(results) => Ok(results.into_iter().map(YaraFinding::from).collect())
         }
     }
 
-    fn scan_compressed<'a, R:Read>(&self, scanner: &mut yara::Scanner, reader: R, file_display_name: &str) -> anyhow::Result<Vec<YaraFinding>> {
+    fn scan_compressed<R:Read>(&self, scanner: &mut yara::Scanner, reader: R, file_display_name: &str) -> anyhow::Result<Vec<YaraFinding>> {
         let (bytes, buffer) = self.read_into_buffer(reader)?;
 
         if bytes == buffer.capacity() {
@@ -521,7 +515,7 @@ impl YaraScanner {
 
         match scanner.scan_mem(&buffer){
             Err(why) => Err(why.into()),
-            Ok(results) => Ok(results.into_iter().map(|r| YaraFinding::from(r)).collect())
+            Ok(results) => Ok(results.into_iter().map(YaraFinding::from).collect())
         }
     }
 
@@ -540,7 +534,7 @@ impl YaraScanner {
                         Ok(res) => {
                             results.extend(res.into_iter().map(|r| r.with_contained_file(&filename)));
                         }
-                        Err(why) => return Err(why.into()),
+                        Err(why) => return Err(why),
                     }
                 }
             }

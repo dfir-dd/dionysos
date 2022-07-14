@@ -6,7 +6,6 @@ use std::path::{PathBuf};
 use std::{thread};
 use std::time::{Instant, Duration};
 use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice, WriteLogger, ConfigBuilder};
-use regex;
 use std::sync::{Arc, mpsc};
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 
@@ -19,9 +18,9 @@ use crate::hash_scanner::HashScanner;
 
 #[derive(ArgEnum, Clone)]
 pub(crate) enum OutputFormat {
-    CSV,
-    TXT,
-    JSON
+    Csv,
+    Txt,
+    Json
 }
 
 #[derive(Parser, Clone)]
@@ -35,7 +34,7 @@ pub (crate) struct Cli {
     path: Option<String>,
 
     /// output format
-    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::TXT, display_order(20))]
+    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::Txt, display_order(20))]
     pub(crate) output_format: OutputFormat,
 
     /// use yara scanner with the specified ruleset. This can be a
@@ -112,7 +111,7 @@ fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEn
         log::trace!("starting {} on {}", scanner, entry.file_name().to_string_lossy());
         let begin = Instant::now();
 
-        for res in scanner.scan_file(&entry).into_iter() {
+        for res in scanner.scan_file(entry).into_iter() {
             match res {
                 Err(why) => {
                     log::error!("{}", why);
@@ -133,10 +132,10 @@ fn handle_file(scanners: &Arc<Vec<Box<dyn FileScanner>>>, entry: &walkdir::DirEn
 fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
             tx: mpsc::Sender<ScannerResult>,
         scanners: Arc<Vec<Box<dyn FileScanner>>>, mystatus: Option<ProgressBar>, progress: Option<Arc<ProgressBar>>) {
-    let rx = &rx;
-    let tx = &tx;
+    let rx_ref = &rx;
+    let tx_ref = &tx;
     loop {
-        match rx.try_recv() {
+        match rx_ref.try_recv() {
             Ok(entry) => {
                 if let Some(s) = &mystatus {
                     s.set_message(entry.file_name().to_string_lossy().to_string());
@@ -147,7 +146,7 @@ fn worker(  rx: spmc::Receiver<walkdir::DirEntry>,
 
                 let result = handle_file(&scanners, &entry);
 
-                if let Err(why) = tx.send(result) {
+                if let Err(why) = tx_ref.send(result) {
                     log::error!("error while sending a scanner result from the worker: {}", why);
                     if let Some(s) = mystatus {
                         s.finish_and_clear();
@@ -207,7 +206,7 @@ impl Dionysos {
             let scanner = Arc::clone(&scanners);
             let rx = rx_in.clone();
             let tx = tx_out.clone();
-            let global_progress = progress.as_ref().and_then(|p|Some(Arc::clone(&p)));
+            let global_progress = progress.as_ref().map(Arc::clone);
             let worker = thread::spawn(move ||{
                 worker(rx, tx, scanner, pb, global_progress)
             });

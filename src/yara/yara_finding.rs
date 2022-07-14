@@ -72,7 +72,7 @@ impl ScannerFinding for YaraFinding {
         lines
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
+    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
         let mut lines = HashSet::new();
 
         if self.strings.is_empty() {
@@ -129,7 +129,7 @@ impl ScannerFinding for YaraFinding {
 }
 
 
-pub fn escape_vec(v: &Vec<u8>) -> String {
+pub fn escape_vec(v: &[u8]) -> String {
     v.iter()
     .map(|b| {let c = char::from(*b); if c.is_ascii_graphic() {
         c.to_string() } else {

@@ -67,7 +67,7 @@ pub struct HashScanner {
 }
 
 impl HashScanner {
-    pub fn with_hashes(mut self, hashes: &Vec<String>) -> Result<Self> {
+    pub fn with_hashes(mut self, hashes: &[String]) -> Result<Self> {
         for hash in hashes.iter() {
             let crypto_hash = Self::parse_hash(hash)?;
             match &crypto_hash {
@@ -119,7 +119,7 @@ impl HashScanner {
 
         let mut results = Vec::new();
         for h in &hashes {
-            if self.hashes.contains(&h) {
+            if self.hashes.contains(h) {
                 results.push(Ok(Box::new(HashScannerFinding{hash: h.clone()}) as Box<dyn ScannerFinding>));
             }
         }
@@ -129,7 +129,7 @@ impl HashScanner {
 
 impl Display for HashScanner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "HashScanner")
+        write!(f, "HashScanner")
     }
 }
 
@@ -166,7 +166,7 @@ impl ScannerFinding for HashScannerFinding {
         ]
     }
 
-    fn format_csv<'a, 'b>(&'b self, file: &'a str) -> HashSet<CsvLine> {
+    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
         hashset![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
     }
     fn to_json(&self, file: &str) -> serde_json::Value {
