@@ -1,5 +1,5 @@
 
-use std::{fmt::Display, error::Error};
+use std::{fmt::Display};
 
 use yara::YaraError;
 

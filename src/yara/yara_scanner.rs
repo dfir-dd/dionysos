@@ -4,7 +4,6 @@ use nt_hive2::KeyNode;
 use walkdir::DirEntry;
 use yara;
 use anyhow::{Result, anyhow};
-use crate::yara::YaraScannerError;
 use crate::filescanner::*;
 use crate::scanner_result;
 use crate::scanner_result::*;

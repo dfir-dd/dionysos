@@ -1,8 +1,7 @@
 use anyhow::{Result, anyhow};
 use clap::{Parser, ArgEnum};
 use walkdir::WalkDir;
-use std::fs::{OpenOptions, File};
-use std::io::Read;
+use std::fs::{OpenOptions};
 use std::path::{PathBuf};
 use std::{thread};
 use std::time::{Instant, Duration};
@@ -64,8 +63,16 @@ pub (crate) struct Cli {
     #[cfg(feature="scan_reg")]
     pub (crate) yara_scan_reg: bool,
 
+    /// allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
+    #[clap(short('C'), long("scan-compressed"), display_order(140))]
+    scan_compressed: bool,
 
-    /// Hash of file to match against. Use any of MD5, SHA1 or SHA256
+    /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
+    #[clap(long("decompression-buffer"), default_value_t=128, display_order(150))]
+    decompression_buffer_size: usize,
+
+    /// Hash of file to match against. Use any of MD5, SHA1 or SHA256.
+    /// This parameter can be specified multiple times
     #[clap(short('H'), long("file-hash"), display_order(200))]
     file_hash: Vec<String>,
 
@@ -74,9 +81,9 @@ pub (crate) struct Cli {
     #[clap(short('F'), long("filename"), display_order(210))]
     filenames: Vec<String>,
 
-    /// do not run the Levenshtein scanner
-    #[clap(long("omit-levenshtein"), display_order(220))]
-    omit_levenshtein: bool,
+    /// run the Levenshtein scanner
+    #[clap(long("levenshtein"), display_order(220))]
+    levenshtein: bool,
 
     /// use the specified NUMBER of threads
     #[clap(short('p'), long("threads"), default_value_t = num_cpus::get(), display_order(300))]
@@ -85,14 +92,6 @@ pub (crate) struct Cli {
     /// display a progress bar (requires counting the number of files to be scanned before a progress bar can be displayed)
     #[clap(long("progress"), display_order(310))]
     pub(crate) display_progress: bool,
-
-    /// allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
-    #[clap(short('C'), long("scan-compressed"), display_order(500))]
-    scan_compressed: bool,
-
-    /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
-    #[clap(long("decompression-buffer"), default_value_t=128, display_order(510))]
-    decompression_buffer_size: usize,
 
     /// path of the file to write logs to. Logs will always be appended
     #[clap(short('L'), long("log-file"), display_order(520))]
@@ -300,7 +299,7 @@ impl Dionysos {
             scanners.push(Box::new(filename_scanner));
         }
 
-        if !self.cli.omit_levenshtein {
+        if self.cli.levenshtein {
             let levenshtein_scanner = LevenshteinScanner::default();
             scanners.push(Box::new(levenshtein_scanner));
         }
