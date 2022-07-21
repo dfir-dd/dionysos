@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Display;
 
 use serde_json::{json, Value};
 
@@ -14,11 +15,12 @@ pub struct YaraFinding {
     pub tags: Vec<String>,
     pub strings: Vec<YaraString>,
     pub value_data: Option<String>,
-    pub contained_file: Option<String>
+    pub contained_file: Option<String>,
+    found_in_file: String,
 }
 
-impl From<yara::Rule<'_>> for YaraFinding {
-    fn from(rule: yara::Rule) -> Self {
+impl YaraFinding {
+    pub fn new(rule: yara::Rule, found_in_file: String) -> Self {
         Self {
             identifier: rule.identifier.to_owned(),
             namespace: rule.namespace.to_owned(),
@@ -26,12 +28,10 @@ impl From<yara::Rule<'_>> for YaraFinding {
             strings: rule.strings.into_iter().map(|s| s.into()).collect(),
             value_data: None,
             contained_file: None,
+            found_in_file
         }
     }
-}
 
-impl YaraFinding {
-    
     pub fn with_value_data(mut self, data: String) -> Self {
         self.value_data = Some(data);
         self
@@ -43,36 +43,36 @@ impl YaraFinding {
     }
 }
 
+impl Display for YaraFinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Yara: {} {}", self.identifier, self.found_in_file())?;
 
-impl ScannerFinding for YaraFinding {
-    fn format_readable(&self, file: &str, show_details: bool) -> Vec<String> {
-        let mut lines = Vec::new();
-        
-        lines.push(format!("Yara: {} {}", self.identifier, file));
-
-        if show_details {
+        if crate::display_strings() {
             for s in self.strings.iter() {
                 if s.matches.is_empty() {
                     match &self.value_data {
-                        None => lines.push(format!("  {} matches", s.identifier)),
-                        Some(d) => lines.push(format!("  '{}' matches to {}", d,s.identifier)),
+                        None => writeln!(f, "  {} matches", s.identifier)?,
+                        Some(d) => writeln!(f, "  '{}' matches to {}", d,s.identifier)?,
                     }
                 } else {
                     match &self.value_data {
-                        None => lines.push(format!("  {} has the following matches:", s.identifier)),
-                        Some(d) => lines.push(format!("  {} has the following matches in '{}':", s.identifier, d))
+                        None => writeln!(f, "  {} has the following matches:", s.identifier)?,
+                        Some(d) => writeln!(f, "  {} has the following matches in '{}':", s.identifier, d)?
                     }
                 
                     for m in s.matches.iter() {
-                        lines.push(format!("    0x{:08x}: {}", m.offset, escape_vec(&m.data)));
+                        writeln!(f, "    0x{:08x}: {}", m.offset, escape_vec(&m.data))?;
                     }
                 }
             }
-        } 
-        lines
+        }
+        Ok(())
     }
+}
 
-    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
+impl ScannerFinding for YaraFinding {
+    fn format_csv(&self) -> HashSet<CsvLine> {
+        let file = self.found_in_file();
         let mut lines = HashSet::new();
 
         if self.strings.is_empty() {
@@ -109,7 +109,8 @@ impl ScannerFinding for YaraFinding {
 
         lines
     }
-    fn to_json(&self, file: &str) -> serde_json::Value {
+    fn to_json(&self) -> serde_json::Value {
+        let file = self.found_in_file();
         json!({
             "01_scanner": "yara",
             "02_suspicious_file": file,
@@ -125,6 +126,10 @@ impl ScannerFinding for YaraFinding {
             }).collect::<Vec<Value>>(),
             "05_contained_file": self.contained_file
         })
+    }
+
+    fn found_in_file(&self) -> &str {
+        &self.found_in_file[..]
     }
 }
 

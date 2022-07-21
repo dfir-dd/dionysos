@@ -1,18 +1,18 @@
-use std::fmt::Display;
-use std::{collections::HashSet, fs::File};
-use std::convert::TryInto;
-use std::hash::Hash;
-use anyhow::{Result,anyhow};
+use anyhow::{anyhow, Result};
 use maplit::hashset;
-use md5::{Md5, Digest};
+use md5::{Digest, Md5};
 use memmap::MmapOptions;
 use serde_json::json;
 use sha1::Sha1;
 use sha2::Sha256;
+use std::convert::TryInto;
+use std::fmt::Display;
+use std::hash::Hash;
+use std::{collections::HashSet, fs::File};
 use walkdir::DirEntry;
 
-use crate::filescanner::FileScanner;
 use crate::csv_line::CsvLine;
+use crate::filescanner::FileScanner;
 use crate::scanner_result::ScannerFinding;
 
 const MD5_SIZE: usize = 128 / 8;
@@ -23,7 +23,7 @@ const SHA256_SIZE: usize = 256 / 8;
 pub enum CryptoHash {
     MD5([u8; MD5_SIZE]),
     SHA1([u8; SHA1_SIZE]),
-    SHA256([u8; SHA256_SIZE])
+    SHA256([u8; SHA256_SIZE]),
 }
 
 impl PartialEq for CryptoHash {
@@ -32,7 +32,7 @@ impl PartialEq for CryptoHash {
             (Self::MD5(l0), Self::MD5(r0)) => l0 == r0,
             (Self::SHA1(l0), Self::SHA1(r0)) => l0 == r0,
             (Self::SHA256(l0), Self::SHA256(r0)) => l0 == r0,
-            (_, _) => false
+            (_, _) => false,
         }
     }
 }
@@ -90,7 +90,11 @@ impl HashScanner {
         }
     }
 
-    fn scan_slice<S: AsRef<[u8]>>(&self, slice: S) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
+    fn scan_slice<S: AsRef<[u8]>>(
+        &self,
+        slice: S,
+        entry: &DirEntry,
+    ) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         let mut hashes = Vec::new();
 
         if self.has_md5_hashes {
@@ -120,7 +124,10 @@ impl HashScanner {
         let mut results = Vec::new();
         for h in &hashes {
             if self.hashes.contains(h) {
-                results.push(Ok(Box::new(HashScannerFinding{hash: h.clone()}) as Box<dyn ScannerFinding>));
+                results.push(Ok(Box::new(HashScannerFinding {
+                    hash: h.clone(),
+                    found_in_file: entry.file_name().to_str().unwrap().to_owned(),
+                }) as Box<dyn ScannerFinding>));
             }
         }
         results
@@ -138,42 +145,53 @@ impl FileScanner for HashScanner {
         const EMPTY_SLICE: [u8; 0] = [];
 
         match entry.metadata() {
-            Err(why) => {
-                return vec![Err(anyhow!("unable to obtain metadata for file '{}'", why))]
-            }
+            Err(why) => return vec![Err(anyhow!("unable to obtain metadata for file '{}'", why))],
             Ok(metadata) => {
                 if metadata.len() == 0 {
-                    self.scan_slice(&EMPTY_SLICE)
+                    self.scan_slice(&EMPTY_SLICE, entry)
                 } else {
                     let file = File::open(entry.path()).unwrap();
                     let mmap = unsafe { MmapOptions::new().map(&file).unwrap() };
-                    self.scan_slice(&mmap)
+                    self.scan_slice(&mmap, entry)
                 }
             }
         }
-
     }
 }
 
 struct HashScannerFinding {
     hash: CryptoHash,
+    found_in_file: String,
+}
+
+impl Display for HashScannerFinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let found_in_file = self.found_in_file();
+        let hash = &self.hash;
+        writeln!(f, "file {found_in_file} has the hash value {hash}")
+    }
 }
 
 impl ScannerFinding for HashScannerFinding {
-    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
-        vec![
-            format!("file {} has the hash value {}", file, self.hash)
-        ]
+    fn format_csv(&self) -> HashSet<CsvLine> {
+        let file = self.found_in_file();
+        hashset![CsvLine::new(
+            "Hash",
+            &format!("{}", self.hash),
+            file,
+            String::new()
+        )]
     }
-
-    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
-        hashset![CsvLine::new("Hash", &format!("{}", self.hash), file, String::new())]
-    }
-    fn to_json(&self, file: &str) -> serde_json::Value {
+    fn to_json(&self) -> serde_json::Value {
+        let file = self.found_in_file();
         json!({
             "01_scanner": "hash",
             "02_suspicious_file": file,
             "03_hash": format!("{}", self.hash)
         })
+    }
+
+    fn found_in_file(&self) -> &str {
+        &self.found_in_file[..]
     }
 }

@@ -39,7 +39,8 @@ impl FileScanner for FilenameScanner
                     Ok(
                         Box::new(
                             FilenameFinding{
-                                pattern: pattern.clone()
+                                pattern: pattern.clone(),
+                                found_in_file: filename.to_string()
                             }
                         ) as Box<dyn ScannerFinding>
                     )
@@ -52,23 +53,33 @@ impl FileScanner for FilenameScanner
 
 struct FilenameFinding {
     pattern: regex::Regex,
+    found_in_file: String,
+}
+
+impl Display for FilenameFinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let found_in_file = self.found_in_file();
+        let pattern = &self.pattern;
+        writeln!(f, "the name of '{found_in_file}' matches the pattern /{pattern}/")
+    }
 }
 
 impl ScannerFinding for FilenameFinding {
-    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
-        vec![
-            format!("the name of '{}' matches the pattern /{}/", file, self.pattern)
-        ]
-    }
 
-    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
+    fn format_csv(&self) -> HashSet<CsvLine> {
+        let file = self.found_in_file();
         hashset![CsvLine::new("Filename", &format!("{}", self.pattern), file, String::new())]
     }
-    fn to_json(&self, file: &str) -> serde_json::Value {
+    fn to_json(&self) -> serde_json::Value {
+        let file = self.found_in_file();
         json!({
             "01_scanner": "filename",
             "02_suspicious_file": file,
             "03_pattern": format!("{}", self.pattern)
         })
+    }
+
+    fn found_in_file(&self) -> &str {
+        &self.found_in_file[..]
     }
 }

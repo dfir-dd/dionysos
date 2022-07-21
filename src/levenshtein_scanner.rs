@@ -52,7 +52,7 @@ impl LevenshteinScanner {
                     let res:  Vec<anyhow::Result<Box<dyn ScannerFinding>>> = self.wellknown_files
                         .iter()
                         .filter(|l| has_levenshtein_distance_one(&os_fn.chars().collect(), l))
-                        .map(|l| Ok(Box::new(LevenshteinScannerFinding{file_name: l.iter().collect()}) as Box<dyn ScannerFinding>))
+                        .map(|l| Ok(Box::new(LevenshteinScannerFinding{file_name: l.iter().collect(),  found_in_file: file.display().to_string()}) as Box<dyn ScannerFinding>))
                         .collect();
                     if file_name == "expl0rer.exe" {
                         assert_eq!(res.len(), 1);
@@ -68,25 +68,34 @@ impl LevenshteinScanner {
 
 struct LevenshteinScannerFinding {
     file_name: String,
+    found_in_file: String,
+}
+
+impl Display for LevenshteinScannerFinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let found_in_file = self.found_in_file();
+        let filename = &self.file_name;
+        writeln!(f, "the name of the file {found_in_file} is very similar to {filename}")
+    }
 }
 
 impl ScannerFinding for LevenshteinScannerFinding {
-    fn format_readable(&self, file: &str, _show_details: bool) -> Vec<String> {
-        vec![
-            format!("the name of the file {} is very similar to {}", file, self.file_name)
-        ]
-    }
-
-    fn format_csv(&self, file: &str) -> HashSet<CsvLine> {
+    fn format_csv(&self) -> HashSet<CsvLine> {
+        let file = self.found_in_file();
         hashset![CsvLine::new("Levenshtein", &self.file_name, file, String::new())]
     }
 
-    fn to_json(&self, file: &str) -> serde_json::Value {
+    fn to_json(&self) -> serde_json::Value {
+        let file = self.found_in_file();
         json!({
             "01_scanner": "levenshtein",
             "02_suspicious_file": file,
             "03_original_name": self.file_name
         })
+    }
+
+    fn found_in_file(&self) -> &str {
+        &self.found_in_file[..]
     }
 }
 
