@@ -175,7 +175,8 @@ pub(crate) struct Cli {
     #[clap(long("progress"), display_order(310))]
     pub(crate) display_progress: bool,
 
-    /// path of the file to write logs to. Logs will always be appended
+    /// path of the file to write error logs to. Error logs will always be appended
+    /// Be aware that this are not the results (e.g. matching yara rules) of this program.
     #[clap(short('L'), long("log-file"), display_order(520))]
     log_file: Option<String>,
 }
