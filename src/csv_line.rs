@@ -1,8 +1,6 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-const CSV_SEP: char = ',';
-
-#[derive(PartialEq, Eq, Hash, Serialize)]
+#[derive(PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CsvLine {
     scanner_name: String,
     rule_name: String,
@@ -18,5 +16,13 @@ impl CsvLine {
             found_in_file: found_in_file.to_owned(),
             details
         }
+    }
+
+    pub fn found_in_file(&self) -> &str {
+        &self.found_in_file[..]
+    }
+
+    pub fn rule_name(&self) -> &str {
+        &self.rule_name[..]
     }
 }

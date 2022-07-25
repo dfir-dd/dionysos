@@ -1,22 +1,21 @@
 use anyhow::{anyhow, Result};
-use clap::{ArgEnum, Parser};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use simplelog::{
     ColorChoice, Config, ConfigBuilder, LevelFilter, TermLogger, TerminalMode, WriteLogger,
 };
 use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
 use walkdir::WalkDir;
 
+use crate::cli::Cli;
 use crate::filename_scanner::FilenameScanner;
 use crate::filescanner::*;
 use crate::hash_scanner::HashScanner;
 use crate::levenshtein_scanner::LevenshteinScanner;
-use crate::scanner_result::{ScannerResult, ScannerFinding};
+use crate::scanner_result::ScannerResult;
 use crate::yara::YaraScanner;
 
 /// this needs to be a global variable,
@@ -35,151 +34,6 @@ fn set_display_strings(val: bool) {
     unsafe { DISPLAY_STRINGS = val }
 }
 
-#[derive(ArgEnum, Clone)]
-pub(crate) enum OutputFormat {
-    Csv,
-    Txt,
-    Json,
-}
-
-impl OutputFormat {
-    pub fn into_options<W: Write>(self, destination: W) -> OutputMethods<W> {
-        let destination = match self {
-            OutputFormat::Csv => OutputDestination::Csv(csv::Writer::from_writer(destination)),
-            OutputFormat::Txt => OutputDestination::Txt(destination),
-            OutputFormat::Json => OutputDestination::Json(destination),
-        };
-        let print_strings = false;
-        OutputMethods {
-            destination,
-            print_strings,
-        }
-    }
-}
-
-pub(crate) struct OutputMethods<W: Write> {
-    destination: OutputDestination<W>,
-    print_strings: bool,
-}
-
-pub(crate) enum OutputDestination<W: Write> {
-    Csv(csv::Writer<W>),
-    Txt(W),
-    Json(W),
-}
-
-impl<W> OutputMethods<W>
-where
-    W: Write,
-{
-    pub fn with_print_strings(mut self, print_strings: bool) -> Self {
-        self.print_strings = print_strings;
-        self
-    }
-
-    pub fn print_strings(&self) -> bool {
-        self.print_strings
-    }
-
-    pub fn destination(&self) -> &OutputDestination<W> {
-        &self.destination
-    }
-
-    pub fn print_result(&mut self, result: &ScannerResult) {
-        for finding in result.findings() {
-            match self.destination {
-                OutputDestination::Csv(ref mut wtr) => {
-                    let _ = finding.format_csv().into_iter().map(|csv| wtr.serialize(csv));
-                },
-                OutputDestination::Txt(ref mut wtr) => {
-                    let _ = write!(wtr, "{}", finding);
-                },
-                OutputDestination::Json(ref mut wtr) => {
-                    let _ = serde_json::to_writer(wtr, &finding.to_json());
-                }
-            }
-        }
-    }
-}
-
-#[derive(Parser, Clone)]
-#[clap(author, version, about, long_about = None)]
-pub(crate) struct Cli {
-    #[clap(flatten)]
-    verbose: clap_verbosity_flag::Verbosity,
-
-    /// path which must be scanned
-    #[clap(short('P'), long("path"), display_order(10))]
-    path: Option<String>,
-
-    /// output format
-    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::Txt, display_order(20))]
-    pub(crate) output_format: OutputFormat,
-
-    /// use yara scanner with the specified ruleset. This can be a
-    /// single file, a zip file or a directory containing lots of
-    /// yara files. Yara files must end with 'yar' or 'yara', and zip
-    /// files must end with 'zip'
-    #[clap(short('Y'), long("yara"), display_order(100))]
-    yara: Option<String>,
-
-    /// timeout for the yara scanner, in seconds
-    #[clap(long("yara-timeout"), default_value_t = 240, display_order(110))]
-    yara_timeout: u16,
-
-    /// print matching strings (only used by yara currently)
-    #[clap(short('s'), long("print-strings"), display_order(120))]
-    pub(crate) print_strings: bool,
-
-    /// also do YARA scan in Windows EVTX records (exported as JSON)
-    #[clap(long("evtx"), display_order(130))]
-    #[cfg(feature = "scan_evtx")]
-    pub(crate) yara_scan_evtx: bool,
-
-    /// also do YARA scan in Windows registry hive files
-    #[clap(long("reg"), display_order(130))]
-    #[cfg(feature = "scan_reg")]
-    pub(crate) yara_scan_reg: bool,
-
-    /// allow yara to scan compressed files. Currently, xz, bz2 and gz are supported
-    #[clap(short('C'), long("scan-compressed"), display_order(140))]
-    scan_compressed: bool,
-
-    /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
-    #[clap(
-        long("decompression-buffer"),
-        default_value_t = 128,
-        display_order(150)
-    )]
-    decompression_buffer_size: usize,
-
-    /// Hash of file to match against. Use any of MD5, SHA1 or SHA256.
-    /// This parameter can be specified multiple times
-    #[clap(short('H'), long("file-hash"), display_order(200))]
-    file_hash: Vec<String>,
-
-    /// regular expression to match against the basename of files.
-    /// This parameter can be specified multiple times
-    #[clap(short('F'), long("filename"), display_order(210))]
-    filenames: Vec<String>,
-
-    /// run the Levenshtein scanner
-    #[clap(long("levenshtein"), display_order(220))]
-    levenshtein: bool,
-
-    /// use the specified NUMBER of threads
-    #[clap(short('p'), long("threads"), default_value_t = num_cpus::get(), display_order(300))]
-    threads: usize,
-
-    /// display a progress bar (requires counting the number of files to be scanned before a progress bar can be displayed)
-    #[clap(long("progress"), display_order(310))]
-    pub(crate) display_progress: bool,
-
-    /// path of the file to write error logs to. Error logs will always be appended
-    /// Be aware that this are not the results (e.g. matching yara rules) of this program.
-    #[clap(short('L'), long("log-file"), display_order(520))]
-    log_file: Option<String>,
-}
 
 pub struct Dionysos {
     path: PathBuf,
@@ -280,12 +134,14 @@ fn worker(
 }
 
 impl Dionysos {
-    pub fn new() -> Result<Self> {
-        Self::parse_options()
+    pub fn new(cli: Cli) -> Result<Self> {
+        Self::parse_options(cli)
     }
 
     pub fn run(&self) -> Result<()> {
-        self.init_logging()?;
+
+        // ignore errors here
+        let _ = self.init_logging();
 
         log::info!("running dionysos version {}", env!("CARGO_PKG_VERSION"));
 
@@ -321,8 +177,11 @@ impl Dionysos {
         drop(tx_out);
 
         let cli = self.cli.clone();
+        
         let writer_thread = thread::spawn(move || {
-            let mut output_options = cli.output_format.into_options(std::io::stdout());
+            let output = cli.open_result_stream().expect("missing output stream");
+            let mut output_options = cli.output_format.into_options(output);
+
             loop {
                 match rx_out.recv() {
                     Err(mpsc::RecvError) => {
@@ -355,7 +214,7 @@ impl Dionysos {
         if let Some(mp) = m_progress {
             mp.clear()?;
         }
-
+        
         Ok(())
     }
 
@@ -454,9 +313,7 @@ impl Dionysos {
         }
     }
 
-    fn parse_options() -> Result<Self> {
-        let cli = Cli::parse();
-
+    fn parse_options(cli: Cli) -> Result<Self> {
         let path = match &cli.path {
             Some(path) => PathBuf::from(&path),
 

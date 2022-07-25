@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 
 use crate::csv_line::CsvLine;
 use crate::scanner_result::ScannerFinding;
+use crate::dionysos::display_strings;
 
 use super::yara_string::YaraString;
 
@@ -47,7 +48,7 @@ impl Display for YaraFinding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Yara: {} {}", self.identifier, self.found_in_file())?;
 
-        if crate::display_strings() {
+        if display_strings() {
             for s in self.strings.iter() {
                 if s.matches.is_empty() {
                     match &self.value_data {
@@ -106,7 +107,6 @@ impl ScannerFinding for YaraFinding {
                 }
             }
         }
-
         lines
     }
     fn to_json(&self) -> serde_json::Value {

@@ -12,6 +12,14 @@ keywords = ["cli", "forensics", "security"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "libdionysos"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dionysos"
+path = "src/main.rs"
+
 [features]
 default = ["scan_evtx", "scan_reg"]
 scan_evtx = ["evtx"]
@@ -57,3 +65,7 @@ evtx = {version="0.7", optional=true, features=["multithreading"]}
 
 nt_hive2 = {version=">=2.2.1", optional=true, features=[]}
 binread = {version="2", optional=true}
+
+[dev-dependencies]
+tempfile = "3"
+serial_test = "0.8"
