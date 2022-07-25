@@ -4,10 +4,24 @@ use std::{path::PathBuf, fs::File, collections::HashSet, io::{BufReader, Read, C
 use libdionysos::{Cli, OutputFormat, Dionysos, CsvLine};
 use serde_json::Value;
 use serial_test::serial;
-use tempfile::{tempdir, TempDir};
+use tempfile::tempdir;
+
+const UNCOMPRESSED_EXPECTED_FILES: & [&str] = &[
+    "sample.zip",
+    "sample1.txt",
+    "sample1.txt.xz"
+];
+
+const COMPRESSED_EXPECTED_FILES: & [&str] = &[
+    "sample.zip:sample1.txt",
+    "sample1.txt",
+    "sample1.txt.bz2",
+    "sample1.txt.gz",
+    "sample1.txt.xz"
+];
 
 fn run_dionysos(cli: Cli) -> String {
-    let mut results_dir = tempdir().unwrap();
+    let results_dir = tempdir().unwrap();
     let results_filename = PathBuf::from(results_dir.path().display().to_string())
         .join("results");
 
@@ -25,49 +39,36 @@ fn run_dionysos(cli: Cli) -> String {
     buf
 }
 
-#[test]
-#[serial]
-fn test_yara_csv() {
-    let result = run_dionysos(prepare_cli().with_format(OutputFormat::Csv));
+fn test_yara_common(format: OutputFormat, scan_compressed: bool, extract_filenames: fn(String) -> HashSet<String>) {
+    let result = run_dionysos(prepare_cli()
+        .with_format(format)
+        .with_scan_compressed(scan_compressed));
+    let data_path = data_path();
 
+    let expected_files = if scan_compressed {
+        &COMPRESSED_EXPECTED_FILES
+    } else {
+        &UNCOMPRESSED_EXPECTED_FILES
+    };
+    
+    let detected_files = extract_filenames(result);
+    for file in expected_files.iter() {
+        let file = data_path.join(file);
+        assert!(detected_files.contains(& file.display().to_string()));
+    }
+}
+
+fn filenames_from_csv(result: String) -> HashSet<String> {
     let mut reader = csv::Reader::from_reader(Cursor::new(result));
-    let mut results = HashSet::new();
+    let mut files = HashSet::new();
     for result in reader.deserialize() { 
         let line: CsvLine = result.unwrap();
-        results.insert(line.found_in_file().to_owned());
+        files.insert(line.found_in_file().to_owned());
     }
-
-    let expected_files = vec![
-        "sample.zip",
-        "sample1.txt",
-        "sample1.txt.xz"
-    ];
-    for file in expected_files.into_iter() {
-        let file = data_path().join(file);
-        assert!(results.contains(& file.display().to_string()));
-    }
+    files
 }
 
-#[test]
-#[serial]
-fn test_yara_txt() {
-    let mut result = run_dionysos(prepare_cli().with_format(OutputFormat::Txt));
-    
-    let expected_files = vec![
-        "sample.zip",
-        "sample1.txt",
-        "sample1.txt.xz"
-    ];
-    for file in expected_files.into_iter() {
-        let file = data_path().join(file);
-        assert!(result.contains(&file.display().to_string()));
-    }
-}
-
-#[test]
-#[serial]
-fn test_yara_json() {
-    let result = run_dionysos(prepare_cli().with_format(OutputFormat::Json));
+fn filenames_from_json(result: String) -> HashSet<String> {
     let reader = BufReader::new(Cursor::new(result));
 
     let mut files = HashSet::new();
@@ -78,7 +79,52 @@ fn test_yara_json() {
 
         files.insert(filename.to_owned());
     }
+    files
+}
 
+#[test]
+fn test_yara_csv() {
+    test_yara_common(
+        OutputFormat::Csv,
+        false,
+        filenames_from_csv
+    );
+}
+
+
+#[test]
+fn test_yara_csv_with_compression() {
+    test_yara_common(
+        OutputFormat::Csv,
+        true,
+        filenames_from_csv
+    );
+}
+
+
+#[test]
+fn test_yara_json() {
+    test_yara_common(
+        OutputFormat::Json,
+        false,
+        filenames_from_json
+    );
+}
+
+
+#[test]
+fn test_yara_json_with_compression() {
+    test_yara_common(
+        OutputFormat::Json,
+        true,
+        filenames_from_json
+    );
+}
+
+#[test]
+fn test_yara_txt() {
+    let result = run_dionysos(prepare_cli().with_format(OutputFormat::Txt));
+    
     let expected_files = vec![
         "sample.zip",
         "sample1.txt",
@@ -86,7 +132,7 @@ fn test_yara_json() {
     ];
     for file in expected_files.into_iter() {
         let file = data_path().join(file);
-        assert!(files.contains(& file.display().to_string()), "missing file {} in {:?}", file.display(), files);
+        assert!(result.contains(&file.display().to_string()));
     }
 }
 

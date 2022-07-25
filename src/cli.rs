@@ -100,7 +100,7 @@ impl Default for Cli {
             yara_scan_evtx: Default::default(),
             yara_scan_reg: Default::default(),
             scan_compressed: Default::default(),
-            decompression_buffer_size: Default::default(),
+            decompression_buffer_size: 128,
             file_hash: Default::default(),
             filenames: Default::default(),
             levenshtein: Default::default(),
@@ -130,6 +130,11 @@ impl Cli {
 
     pub fn with_output_file(mut self, filename: String) -> Self {
         self.output_file = filename;
+        self
+    }
+
+    pub fn with_scan_compressed(mut self, scan_compressed: bool) -> Self {
+        self.scan_compressed = scan_compressed;
         self
     }
 
