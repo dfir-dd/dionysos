@@ -1,10 +1,10 @@
-![Crates.io](https://img.shields.io/crates/v/dionysos)
+[![Crates.io](https://img.shields.io/crates/v/dionysos)](https://crates.io/crates/dionysos)
 ![Crates.io](https://img.shields.io/crates/l/dionysos)
 ![Crates.io (latest)](https://img.shields.io/crates/dv/dionysos)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/janstarke/dionysos/rust-clippy%20analyze?label=clippy)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/janstarke/dionysos/publish%20at%20crates.io?label=crates.io)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/janstarke/dionysos/Build%20static%20Debian%20package?label=build%20debian%20package)
-![Codecov](https://img.shields.io/codecov/c/github/janstarke/dionysos)
+[![Codecov](https://img.shields.io/codecov/c/github/janstarke/dionysos)](https://app.codecov.io/gh/janstarke/dionysos)
 
 # `dionysos`
 Scanner for various IoCs
