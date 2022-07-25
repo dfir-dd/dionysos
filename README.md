@@ -4,6 +4,7 @@
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/janstarke/dionysos/rust-clippy%20analyze?label=clippy)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/janstarke/dionysos/publish%20at%20crates.io?label=crates.io)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/janstarke/dionysos/Build%20static%20Debian%20package?label=build%20debian%20package)
+![Codecov](https://img.shields.io/codecov/c/github/janstarke/dionysos)
 
 # `dionysos`
 Scanner for various IoCs
