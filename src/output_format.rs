@@ -19,10 +19,8 @@ impl OutputFormat {
             OutputFormat::Txt => OutputDestination::Txt(destination),
             OutputFormat::Json => OutputDestination::Json(destination),
         };
-        let print_strings = false;
         OutputMethods {
-            destination,
-            print_strings,
+            destination
         }
     }
 }

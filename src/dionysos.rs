@@ -139,7 +139,6 @@ impl Dionysos {
     }
 
     pub fn run(&self) -> Result<()> {
-
         // ignore errors here
         let _ = self.init_logging();
 
@@ -340,6 +339,8 @@ impl Dionysos {
             .iter()
             .map(|f| regex::Regex::new(f).unwrap())
             .collect();
+
+        set_display_strings(cli.print_strings);
 
         Ok(Self {
             path,

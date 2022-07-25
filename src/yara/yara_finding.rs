@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use crate::csv_line::CsvLine;
 use crate::scanner_result::ScannerFinding;
-use crate::dionysos::display_strings;
+use crate::dionysos::{display_strings, skip_display_strings};
 
 use super::yara_string::YaraString;
 
@@ -76,7 +76,7 @@ impl ScannerFinding for YaraFinding {
         let file = self.found_in_file();
         let mut lines = HashSet::new();
 
-        if self.strings.is_empty() {
+        if self.strings.is_empty() || skip_display_strings() {
             lines.insert(
                 CsvLine::new("Yara", &self.identifier, file, String::new())
             );
