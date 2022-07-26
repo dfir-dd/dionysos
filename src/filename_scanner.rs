@@ -19,6 +19,25 @@ impl FilenameScanner {
             patterns,
         }
     }
+
+    fn scan_file_str(&self, filename: &str, filepath: &str) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
+        let mut results = Vec::new();
+        for pattern in self.patterns.iter() {
+            if pattern.is_match(filename) {
+                results.push(
+                    Ok(
+                        Box::new(
+                            FilenameFinding{
+                                pattern: pattern.clone(),
+                                found_in_file: filepath.to_owned()
+                            }
+                        ) as Box<dyn ScannerFinding>
+                    )
+                )
+            }
+        }
+        results
+    }
 }
 
 impl Display for FilenameScanner {
@@ -30,24 +49,9 @@ impl Display for FilenameScanner {
 impl FileScanner for FilenameScanner
 {
     fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
-        let file = file.path();
-        let filename = file.to_str().unwrap();
-        let mut results = Vec::new();
-        for pattern in self.patterns.iter() {
-            if pattern.is_match(filename) {
-                results.push(
-                    Ok(
-                        Box::new(
-                            FilenameFinding{
-                                pattern: pattern.clone(),
-                                found_in_file: filename.to_string()
-                            }
-                        ) as Box<dyn ScannerFinding>
-                    )
-                )
-            }
-        }
-        results
+        self.scan_file_str(
+            file.file_name().to_str().unwrap_or(& file.file_name().to_string_lossy()), 
+            file.path().to_str().unwrap_or(& file.path().to_string_lossy()))
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "dionysos"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2018"
 description = "Scanner for various IoCs"
 homepage = "https://www.github.com/janstarke/dionysos"
@@ -68,4 +68,3 @@ binread = {version="2", optional=true}
 
 [dev-dependencies]
 tempfile = "3"
-serial_test = "0.8"

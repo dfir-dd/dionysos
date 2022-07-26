@@ -138,6 +138,16 @@ impl Cli {
         self
     }
 
+    pub fn with_hash(mut self, hash: &str) -> Self {
+        self.file_hash.push(hash.to_owned());
+        self
+    }
+
+    pub fn with_filename(mut self, filename: &str) -> Self {
+        self.filenames.push(filename.to_owned());
+        self
+    }
+
     pub fn open_result_stream(&self) -> std::io::Result<Box<dyn Write>> {
         let stream =
         if self.output_file == "-" {

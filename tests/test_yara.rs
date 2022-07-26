@@ -1,10 +1,10 @@
 
-use std::{path::PathBuf, fs::File, collections::HashSet, io::{BufReader, Read, Cursor, BufRead}};
+use std::path::PathBuf;
 
-use libdionysos::{Cli, OutputFormat, Dionysos, CsvLine};
-use serde_json::Value;
-use serial_test::serial;
-use tempfile::tempdir;
+use common::{data_path, filenames_from, run_dionysos};
+use libdionysos::{Cli, OutputFormat};
+
+mod common;
 
 const UNCOMPRESSED_EXPECTED_FILES: & [&str] = &[
     "sample.zip",
@@ -20,26 +20,8 @@ const COMPRESSED_EXPECTED_FILES: & [&str] = &[
     "sample1.txt.xz"
 ];
 
-fn run_dionysos(cli: Cli) -> String {
-    let results_dir = tempdir().unwrap();
-    let results_filename = PathBuf::from(results_dir.path().display().to_string())
-        .join("results");
-
-    let cli = cli
-        .with_output_file(results_filename.display().to_string());
-    {
-        let dionysos = Dionysos::new(cli).unwrap();
-        dionysos.run().unwrap();
-    }
-
-    let mut input_file = BufReader::new(File::open(results_filename).unwrap());
-    let mut buf = String::new();
-    input_file.read_to_string(&mut buf).unwrap();
-    results_dir.close().unwrap();
-    buf
-}
-
-fn test_yara_common(format: OutputFormat, scan_compressed: bool, extract_filenames: fn(String) -> HashSet<String>) {
+fn test_yara_common(format: OutputFormat, scan_compressed: bool) {
+    let extract_filenames = filenames_from(&format);
     let result = run_dionysos(prepare_cli()
         .with_format(format)
         .with_scan_compressed(scan_compressed));
@@ -58,36 +40,11 @@ fn test_yara_common(format: OutputFormat, scan_compressed: bool, extract_filenam
     }
 }
 
-fn filenames_from_csv(result: String) -> HashSet<String> {
-    let mut reader = csv::Reader::from_reader(Cursor::new(result));
-    let mut files = HashSet::new();
-    for result in reader.deserialize() { 
-        let line: CsvLine = result.unwrap();
-        files.insert(line.found_in_file().to_owned());
-    }
-    files
-}
-
-fn filenames_from_json(result: String) -> HashSet<String> {
-    let reader = BufReader::new(Cursor::new(result));
-
-    let mut files = HashSet::new();
-    for line in reader.lines() {
-
-        let v: Value = serde_json::from_str(&line.unwrap()).unwrap();
-        let filename = v.get("02_suspicious_file").unwrap().as_str().unwrap();
-
-        files.insert(filename.to_owned());
-    }
-    files
-}
-
 #[test]
 fn test_yara_csv() {
     test_yara_common(
         OutputFormat::Csv,
-        false,
-        filenames_from_csv
+        false
     );
 }
 
@@ -96,8 +53,7 @@ fn test_yara_csv() {
 fn test_yara_csv_with_compression() {
     test_yara_common(
         OutputFormat::Csv,
-        true,
-        filenames_from_csv
+        true
     );
 }
 
@@ -106,8 +62,7 @@ fn test_yara_csv_with_compression() {
 fn test_yara_json() {
     test_yara_common(
         OutputFormat::Json,
-        false,
-        filenames_from_json
+        false
     );
 }
 
@@ -116,8 +71,7 @@ fn test_yara_json() {
 fn test_yara_json_with_compression() {
     test_yara_common(
         OutputFormat::Json,
-        true,
-        filenames_from_json
+        true
     );
 }
 
@@ -134,14 +88,6 @@ fn test_yara_txt() {
         let file = data_path().join(file);
         assert!(result.contains(&file.display().to_string()));
     }
-}
-
-fn data_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("data")
-        .canonicalize()
-        .unwrap()
 }
 
 fn prepare_cli() -> Cli {
