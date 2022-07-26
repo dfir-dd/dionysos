@@ -123,6 +123,16 @@ impl Cli {
         self
     }
 
+    pub fn with_yara_evtx(mut self, use_evtx: bool) -> Self {
+        self.yara_scan_evtx = use_evtx;
+        self
+    }
+
+    pub fn with_yara_reg(mut self, use_reg: bool) -> Self {
+        self.yara_scan_reg = use_reg;
+        self
+    }
+
     pub fn with_format(mut self, format: OutputFormat) -> Self {
         self.output_format = format;
         self
