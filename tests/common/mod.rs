@@ -1,8 +1,16 @@
-use std::{path::PathBuf, collections::HashSet, io::{Cursor, BufReader, BufRead, Read}, fs::File};
+pub (crate) mod predicates;
 
-use libdionysos::{CsvLine, Cli, Dionysos, OutputFormat};
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::{BufRead, BufReader, Cursor, Read},
+    path::PathBuf,
+};
+
+use libdionysos::{Cli, CsvLine, Dionysos, OutputFormat};
 use serde_json::Value;
 use tempfile::tempdir;
+
 
 pub fn data_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -12,22 +20,21 @@ pub fn data_path() -> PathBuf {
         .unwrap()
 }
 
-pub fn filenames_from_csv(result: String) -> HashSet<String> {
+pub fn filenames_from_csv<T: std::convert::AsRef<[u8]>>(result: T) -> HashSet<String> {
     let mut reader = csv::Reader::from_reader(Cursor::new(result));
     let mut files = HashSet::new();
-    for result in reader.deserialize() { 
+    for result in reader.deserialize() {
         let line: CsvLine = result.unwrap();
         files.insert(line.found_in_file().to_owned());
     }
     files
 }
 
-pub fn filenames_from_json(result: String) -> HashSet<String> {
+pub fn filenames_from_json<T: std::convert::AsRef<[u8]>>(result: T) -> HashSet<String> {
     let reader = BufReader::new(Cursor::new(result));
 
     let mut files = HashSet::new();
     for line in reader.lines() {
-
         let v: Value = serde_json::from_str(&line.unwrap()).unwrap();
         let filename = v.get("02_suspicious_file").unwrap().as_str().unwrap();
 
@@ -38,11 +45,9 @@ pub fn filenames_from_json(result: String) -> HashSet<String> {
 
 pub fn run_dionysos(cli: Cli) -> String {
     let results_dir = tempdir().unwrap();
-    let results_filename = PathBuf::from(results_dir.path().display().to_string())
-        .join("results");
+    let results_filename = PathBuf::from(results_dir.path().display().to_string()).join("results");
 
-    let cli = cli
-        .with_output_file(results_filename.display().to_string());
+    let cli = cli.with_output_file(results_filename.display().to_string());
     {
         let dionysos = Dionysos::new(cli).unwrap();
         dionysos.run().unwrap();
@@ -62,3 +67,4 @@ pub fn filenames_from(format: &OutputFormat) -> fn(String) -> HashSet<String> {
         OutputFormat::Json => filenames_from_json,
     }
 }
+

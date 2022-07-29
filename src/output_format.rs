@@ -24,3 +24,13 @@ impl OutputFormat {
         }
     }
 }
+
+impl From<OutputFormat> for &str {
+    fn from(val: OutputFormat) -> Self {
+        match val {
+            OutputFormat::Csv => "csv",
+            OutputFormat::Txt => "txt",
+            OutputFormat::Json => "json",
+        }
+    }
+}
