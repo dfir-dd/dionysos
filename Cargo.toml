@@ -27,7 +27,7 @@ scan_reg = ["nt_hive2", "binread"]
 
 [package.metadata.deb]
 license-file = "LICENSE"
-depends = "libyara (>=4.2.1), file"
+depends = "libyara (>=4.2.1), file, libclang"
 
 [dependencies]
 anyhow = "1.0"
