@@ -1,11 +1,11 @@
 use std::io::Write;
 
-use clap::ArgEnum;
+use clap::ValueEnum;
 
 use crate::{output_methods::OutputMethods, output_destination::OutputDestination};
 
 
-#[derive(ArgEnum, Clone)]
+#[derive(ValueEnum, Clone)]
 pub enum OutputFormat {
     Csv,
     Txt,

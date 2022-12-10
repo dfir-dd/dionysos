@@ -14,7 +14,7 @@ pub struct Cli {
     pub(crate) path: Option<String>,
 
     /// output format
-    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::Txt, display_order(20))]
+    #[clap(short('f'),long("format"), value_enum, default_value_t=OutputFormat::Txt, display_order(20))]
     pub(crate) output_format: OutputFormat,
 
     /// path of the file to write results to. Specify '-' write to STDOUT, which is the default
