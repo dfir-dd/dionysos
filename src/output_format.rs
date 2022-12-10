@@ -13,15 +13,13 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    pub(crate) fn into_options<W: Write>(self, destination: W) -> OutputMethods<W> {
+    pub(crate) fn to_options<W: Write>(&self, destination: W) -> OutputMethods<W> {
         let destination = match self {
             OutputFormat::Csv => OutputDestination::Csv(csv::Writer::from_writer(destination)),
             OutputFormat::Txt => OutputDestination::Txt(destination),
             OutputFormat::Json => OutputDestination::Json(destination),
         };
-        OutputMethods {
-            destination
-        }
+        destination.into()
     }
 }
 

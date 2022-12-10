@@ -145,7 +145,7 @@ impl FileScanner for HashScanner {
         const EMPTY_SLICE: [u8; 0] = [];
 
         match entry.metadata() {
-            Err(why) => return vec![Err(anyhow!("unable to obtain metadata for file '{}'", why))],
+            Err(why) => vec![Err(anyhow!("unable to obtain metadata for file '{}'", why))],
             Ok(metadata) => {
                 if metadata.len() == 0 {
                     self.scan_slice(&EMPTY_SLICE, entry)
