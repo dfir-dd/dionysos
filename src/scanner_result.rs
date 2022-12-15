@@ -27,6 +27,11 @@ impl ScannerResult {
         self.findings.push(finding);
     }
 
+
+    pub fn add_findings(&mut self, findings: impl Iterator<Item=Box<dyn ScannerFinding>>) {
+        self.findings.extend(findings);
+    }
+
     pub fn has_findings(&self) -> bool {
         ! self.findings.is_empty()
     }

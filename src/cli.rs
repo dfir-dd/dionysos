@@ -1,5 +1,3 @@
-use std::{io::Write, fs::File};
-
 use clap::Parser;
 use clap_verbosity_flag::Verbosity;
 
@@ -16,12 +14,12 @@ pub struct Cli {
     pub(crate) path: Option<String>,
 
     /// output format
-    #[clap(short('f'),long("format"), arg_enum, default_value_t=OutputFormat::Txt, display_order(20))]
+    #[clap(short('f'),long("format"), value_enum, default_value_t=OutputFormat::Txt, display_order(20))]
     pub(crate) output_format: OutputFormat,
 
-    /// path of the file to write results to. Specify '-' write to STDOUT.
-    #[clap(short('O'), long("output-file"), default_value_t = String::from("-"), display_order(30))]
-    output_file: String,
+    /// path of the file to write results to. Specify '-' write to STDOUT, which is the default
+    #[clap(short('O'), long("output-file"), display_order(30))]
+    output_file: Option<String>,
 
     /// use yara scanner with the specified ruleset. This can be a
     /// single file, a zip file or a directory containing lots of
@@ -107,7 +105,7 @@ impl Default for Cli {
             threads: num_cpus::get(),
             display_progress: Default::default(),
             log_file: Default::default(),
-            output_file: String::from("-"),
+            output_file: Default::default(),
         }
     }
 }
@@ -139,7 +137,11 @@ impl Cli {
     }
 
     pub fn with_output_file(mut self, filename: String) -> Self {
-        self.output_file = filename;
+        if filename == "-" {
+            self.output_file = None
+        } else {
+            self.output_file = Some(filename);
+        }
         self
     }
 
@@ -158,14 +160,7 @@ impl Cli {
         self
     }
 
-    pub fn open_result_stream(&self) -> std::io::Result<Box<dyn Write>> {
-        let stream =
-        if self.output_file == "-" {
-            Box::new(std::io::stdout()) as Box<dyn Write>
-        } else {
-            let stream = File::create(&self.output_file)?;
-            Box::new(stream) as Box<dyn Write>
-        };
-        Ok(stream)
+    pub fn output_file(&self) -> Option<&String> {
+        self.output_file.as_ref()
     }
 }
