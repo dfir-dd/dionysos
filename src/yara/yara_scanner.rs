@@ -616,8 +616,11 @@ impl YaraScanner {
         if bytes == buffer.capacity() {
             log::warn!("file '{file_display_name}' could not be decompressed completely")
         } else {
-            assert!(!buffer.is_empty(), "uncompressed no bytes from '{}'", file_display_name);
-            log::info!("uncompressed {bytes} bytes from '{file_display_name}'");
+            if buffer.is_empty() {
+                log::warn!("uncompressed no bytes from '{}'", file_display_name);
+            } else {
+                log::info!("uncompressed {bytes} bytes from '{file_display_name}'");
+            }
         }
 
         match scanner.scan_mem(&buffer) {
