@@ -6,9 +6,11 @@ use anyhow::{anyhow, Result};
 use bzip2::read::BzDecoder;
 use filemagic::magic;
 use flate2::read::GzDecoder;
+use nt_hive2::DirtyHive;
 use nt_hive2::Hive;
 use nt_hive2::HiveParseMode;
 use nt_hive2::KeyNode;
+use nt_hive2::CleanHive;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
@@ -157,7 +159,7 @@ impl FileScanner for YaraScanner {
                 if self.scan_evtx && matches!(file_type, FileType::Evtx) {
                     let hive_file = File::open(file).unwrap();
                     let hive = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
-                        Ok(hive) => hive,
+                        Ok(hive) => hive.treat_hive_as_clean(),
                         Err(why) => return vec![Err(anyhow!("{}", why))],
                     };
 
@@ -479,7 +481,7 @@ impl YaraScanner {
     fn scan_reg<'a>(
         &self,
         scanner: &'a mut yara::Scanner,
-        mut hive: Hive<File>,
+        mut hive: Hive<File, CleanHive>,
         filename: &str,
     ) -> anyhow::Result<Vec<YaraFinding>> {
         let root_key = hive.root_key_node()?;
@@ -492,7 +494,7 @@ impl YaraScanner {
 
     fn scan_key<'a>(
         scanner: &'a mut yara::Scanner,
-        hive: &mut Hive<File>,
+        hive: &mut Hive<File, CleanHive>,
         key: &KeyNode,
         path: String,
         filename: &str,
@@ -615,12 +617,10 @@ impl YaraScanner {
 
         if bytes == buffer.capacity() {
             log::warn!("file '{file_display_name}' could not be decompressed completely")
+        } else if buffer.is_empty() {
+            log::warn!("uncompressed no bytes from '{}'", file_display_name);
         } else {
-            if buffer.is_empty() {
-                log::warn!("uncompressed no bytes from '{}'", file_display_name);
-            } else {
-                log::info!("uncompressed {bytes} bytes from '{file_display_name}'");
-            }
+            log::info!("uncompressed {bytes} bytes from '{file_display_name}'");
         }
 
         match scanner.scan_mem(&buffer) {
