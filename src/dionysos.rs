@@ -142,11 +142,23 @@ impl Dionysos {
 
     fn scan_to_output<W: Write + Send>(&self, scanners: Arc<Vec<Box<dyn FileScanner>>>, output: W) {
         let output = self.cli.output_format.to_options(output);
+        let filename_filter = |e: &walkdir::DirEntry| {
+            match self.cli.exclude_pattern.as_ref() {
+                None => true,
+                Some(r) => {
+                    match e.file_name().to_str() {
+                        Some(filename) => !r.is_match(filename),
+                        None => !r.is_match(&e.file_name().to_string_lossy())
+                    }
+                }
+            }
+        };  
 
         WalkDir::new(&self.path)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().is_file())
+            .filter(filename_filter)
             .par_bridge()
             .for_each(|entry| {
                 log::info!("scanning '{}'", entry.path().display());

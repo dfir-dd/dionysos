@@ -1,5 +1,6 @@
 use clap::Parser;
 use clap_verbosity_flag::Verbosity;
+use regex::Regex;
 
 use crate::output_format::OutputFormat;
 
@@ -50,6 +51,10 @@ pub struct Cli {
     #[clap(short('C'), long("scan-compressed"), display_order(140))]
     pub(crate) scan_compressed: bool,
 
+    /// do not scan files whose names match the specified regular expression (case sensitive match)
+    #[clap(long("exclude-pattern"), display_order(150))]
+    pub(crate) exclude_pattern: Option<Regex>,
+
     /// maximum size (in MiB) of decompression buffer (per thread), which is used to scan compressed files
     #[clap(
         long("decompression-buffer"),
@@ -98,6 +103,7 @@ impl Default for Cli {
             yara_scan_evtx: Default::default(),
             yara_scan_reg: Default::default(),
             scan_compressed: Default::default(),
+            exclude_pattern: Default::default(),
             decompression_buffer_size: 128,
             file_hash: Default::default(),
             filenames: Default::default(),
