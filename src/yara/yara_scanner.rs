@@ -6,7 +6,6 @@ use anyhow::{anyhow, Result};
 use bzip2::read::BzDecoder;
 use filemagic::magic;
 use flate2::read::GzDecoder;
-use nt_hive2::DirtyHive;
 use nt_hive2::Hive;
 use nt_hive2::HiveParseMode;
 use nt_hive2::KeyNode;
@@ -156,7 +155,7 @@ impl FileScanner for YaraScanner {
 
             FileType::Reg => {
                 #[cfg(feature = "scan_reg")]
-                if self.scan_evtx && matches!(file_type, FileType::Evtx) {
+                if self.scan_reg && matches!(file_type, FileType::Reg) {
                     let hive_file = File::open(file).unwrap();
                     let hive = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
                         Ok(hive) => hive.treat_hive_as_clean(),
@@ -343,7 +342,7 @@ impl YaraScanner {
     {
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
-            if Self::points_to_yara_file(&path)? {
+            if Self::points_to_yara_file(path)? {
                 Self::add_rules_from_yara(rules, path)?;
             }
         }
