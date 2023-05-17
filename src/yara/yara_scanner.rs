@@ -6,10 +6,10 @@ use anyhow::{anyhow, Result};
 use bzip2::read::BzDecoder;
 use filemagic::magic;
 use flate2::read::GzDecoder;
+use nt_hive2::CleanHive;
 use nt_hive2::Hive;
 use nt_hive2::HiveParseMode;
 use nt_hive2::KeyNode;
-use nt_hive2::CleanHive;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
@@ -84,8 +84,9 @@ impl FileScanner for YaraScanner {
             })
             .with_filetype(magic.clone().unwrap_or_else(|| "-".to_owned()));
 
-        externals = if cfg!(target_family = "unix") {
-            externals.with_owner(match file.display().to_string().owner() {
+        #[cfg(target_family = "unix")]
+        {
+            externals = externals.with_owner(match file.display().to_string().owner() {
                 Ok(owner) => match owner.name() {
                     Ok(name) => name.unwrap_or_else(|| owner.id().to_string()),
                     Err(why) => {
@@ -94,10 +95,13 @@ impl FileScanner for YaraScanner {
                     }
                 },
                 Err(why) => return vec![Err(anyhow!("unable to determine file owner: {:?}", why))],
-            })
-        } else {
-            externals.with_owner("-".to_owned())
-        };
+            });
+        }
+
+        #[cfg(not(target_family = "unix"))]
+        {
+            externals.with_owner("-".to_owned());
+        }
 
         let mut scanner = match self.rules.scanner() {
             Err(why) => return vec![Err(anyhow!("unable to create yara scanner: {:?}", why))],
