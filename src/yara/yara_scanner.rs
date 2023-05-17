@@ -100,7 +100,7 @@ impl FileScanner for YaraScanner {
 
         #[cfg(not(target_family = "unix"))]
         {
-            externals.with_owner("-".to_owned());
+            externals = externals.with_owner("-".to_owned());
         }
 
         let mut scanner = match self.rules.scanner() {
