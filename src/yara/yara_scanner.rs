@@ -15,6 +15,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::Instant;
 use walkdir::DirEntry;
 use walkdir::WalkDir;
@@ -35,6 +36,8 @@ pub struct YaraScanner {
     buffer_size: usize,
     scan_evtx: bool,
     scan_reg: bool,
+
+    can_use_magic: Mutex<bool>,
 }
 
 #[derive(Debug)]
@@ -59,19 +62,33 @@ impl FileScanner for YaraScanner {
         let mut results = Vec::new();
         let file = file.path();
 
-        let magic = match magic!().unwrap().file(file) {
-            Ok(magic) => {
-                log::info!("treating '{}' as '{}'", file.display(), &magic);
-                Some(magic)
+        let magic = if *(self.can_use_magic.lock().unwrap()) {
+            match magic!() {
+                Ok(m) => {
+                    match m.file(file) {
+                        Ok(magic) => {
+                            log::info!("treating '{}' as '{}'", file.display(), &magic);
+                            Some(magic)
+                        }
+                        Err(why) => {
+                            log::warn!(
+                                "unable to determine file type for '{}': {}",
+                                file.display(),
+                                why
+                            );
+                            None
+                        }
+                    }
+                },
+                Err(why) => {
+                    log::error!("unable to use magic: {why}");
+                    log::warn!("detecting compressed files, hive files and event log files will not work");
+                    *(self.can_use_magic.lock().unwrap()) = false;
+                    None
+                },
             }
-            Err(why) => {
-                log::warn!(
-                    "unable to determine file type for '{}': {}",
-                    file.display(),
-                    why
-                );
-                None
-            }
+        } else {
+            None
         };
 
         // prepare externals, which are required by some signature-base rules
@@ -160,26 +177,7 @@ impl FileScanner for YaraScanner {
             FileType::Reg => {
                 #[cfg(feature = "scan_reg")]
                 if self.scan_reg && matches!(file_type, FileType::Reg) {
-                    let hive_file = File::open(file).unwrap();
-                    let hive = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
-                        Ok(hive) => hive.treat_hive_as_clean(),
-                        Err(why) => return vec![Err(anyhow!("{}", why))],
-                    };
-
-                    if hive.is_primary_file() {
-                        log::trace!(
-                            "scanning for IOCs inside registry hive file '{}'",
-                            file.display()
-                        );
-
-                        self.scan_reg(&mut scanner, hive, &file.to_string_lossy())
-                    } else {
-                        log::trace!(
-                            "'{}' is no primary hive file, using the normal yara scanner",
-                            file.display()
-                        );
-                        self.scan_file(&mut scanner, file)
-                    }
+                    self.scan_hive_file(file, &mut scanner)
                 } else {
                     self.scan_file(&mut scanner, file)
                 }
@@ -252,6 +250,8 @@ impl YaraScanner {
 
             scan_evtx: false,
             scan_reg: false,
+
+            can_use_magic: Mutex::new(true),
         })
     }
 
@@ -662,5 +662,42 @@ impl YaraScanner {
             }
         }
         Ok(results)
+    }
+
+    fn scan_hive_file(
+        &self,
+        file: &Path,
+        scanner: &mut yara::Scanner,
+    ) -> Result<Vec<YaraFinding>, anyhow::Error> {
+        let hive_file = File::open(file)?;
+
+        let findings = match Hive::new(hive_file, HiveParseMode::NormalWithBaseBlock) {
+            Ok(hive) => {
+                let hive = hive.treat_hive_as_clean();
+                if hive.is_primary_file() {
+                    log::trace!(
+                        "scanning for IOCs inside registry hive file '{}'",
+                        file.display()
+                    );
+
+                    self.scan_reg(scanner, hive, &file.to_string_lossy())?
+                } else {
+                    log::trace!(
+                        "'{}' is no primary hive file, using the normal yara scanner",
+                        file.display()
+                    );
+                    self.scan_file(scanner, file)?
+                }
+            }
+            Err(why) => {
+                log::error!(
+                    "Unable to scan hive file '{file}': {why}; using normal yara scanner",
+                    file = file.to_string_lossy()
+                );
+                self.scan_file(scanner, file)?
+            }
+        };
+
+        Ok(findings)
     }
 }
