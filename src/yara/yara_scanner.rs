@@ -294,13 +294,25 @@ impl YaraScanner {
         P: AsRef<Path>,
         R: std::io::Read,
     {
-        log::trace!("parsing yara file: '{}'", path.as_ref().display());
+        log::info!("parsing yara file: '{}'", path.as_ref().display());
         let mut yara_content = String::new();
         stream.read_to_string(&mut yara_content)?;
 
-        rules.push(yara_content);
-
-        Ok(())
+        // pretest the yara file. If there are any syntax errors, the compiler cannot be reused
+        let mut compiler = yara::Compiler::new()?;
+        for entry in YaraExternals::dummy().to_hashmap() {
+            compiler.define_variable(entry.0, entry.1)?;
+        }
+        match compiler.add_rules_str(&yara_content) {
+            Ok(_) => {
+                rules.push(yara_content);
+                Ok(())
+            }
+            Err(why) => {
+                log::error!("unable to compile {}: {why}", path.as_ref().display());
+                Ok(())
+            }
+        }
     }
 
     fn add_rules_from_zip<P>(rules: &mut Vec<String>, path: P) -> Result<()>
