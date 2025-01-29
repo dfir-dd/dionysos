@@ -138,6 +138,7 @@ impl FileScanner for YaraScanner {
 
         // check if the file is a compressed file and must be decompressed before scanning
         let file_type = self.get_filetype(magic, file);
+        log::trace!("treating {} as {file_type:?}", file.to_string_lossy());
 
         let scan_result = match file_type {
             FileType::GZip => self.scan_compressed(
@@ -422,9 +423,9 @@ impl YaraScanner {
     }
 
     #[cfg(feature = "scan_evtx")]
-    fn scan_evtx<'a>(
+    fn scan_evtx(
         &self,
-        scanner: &'a mut yara::Scanner,
+        scanner: &mut yara::Scanner,
         file: &Path,
     ) -> anyhow::Result<Vec<YaraFinding>> {
         log::trace!("scanning for IOCs inside evtx file '{}'", file.display());
@@ -448,8 +449,8 @@ impl YaraScanner {
     }
 
     #[cfg(feature = "scan_evtx")]
-    fn scan_json<'a>(
-        scanner: &'a mut yara::Scanner,
+    fn scan_json(
+        scanner: &mut yara::Scanner,
         val: &Value,
         filename: &str,
     ) -> anyhow::Result<Vec<YaraFinding>> {
@@ -478,8 +479,8 @@ impl YaraScanner {
     }
 
     #[cfg(feature = "scan_evtx")]
-    fn scan_string<'a>(
-        scanner: &'a mut yara::Scanner,
+    fn scan_string(
+        scanner: &mut yara::Scanner,
         s: &String,
         filename: &str,
     ) -> Result<Vec<YaraFinding>, yara::YaraError> {
@@ -493,9 +494,9 @@ impl YaraScanner {
     }
 
     #[cfg(feature = "scan_reg")]
-    fn scan_reg<'a>(
+    fn scan_reg(
         &self,
-        scanner: &'a mut yara::Scanner,
+        scanner: &mut yara::Scanner,
         mut hive: Hive<File, CleanHive>,
         filename: &str,
     ) -> anyhow::Result<Vec<YaraFinding>> {
@@ -507,8 +508,8 @@ impl YaraScanner {
         }
     }
 
-    fn scan_key<'a>(
-        scanner: &'a mut yara::Scanner,
+    fn scan_key(
+        scanner: &mut yara::Scanner,
         hive: &mut Hive<File, CleanHive>,
         key: &KeyNode,
         path: String,
@@ -566,17 +567,19 @@ impl YaraScanner {
     }
 
     fn get_filetype(&self, magic: Option<String>, file: &Path) -> FileType {
-        let file_type = if self.scan_compressed {
+        
+        if self.scan_compressed {
             if let Some(m) = &magic {
-                if m == "XZ compressed data" {
+                if m.starts_with("XZ compressed data") {
                     FileType::XZ
                 } else if m.starts_with("gzip compressed data") {
                     FileType::GZip
                 } else if m.starts_with("bzip2 compressed data") {
                     FileType::BZip2
-                } else if m.starts_with("MS Windows Vista Event Log,") {
+                } else if   m.starts_with("MS Windows Vista Event Log,") ||
+                            m.starts_with("MS Windows 10-11 Event Log") {
                     FileType::Evtx
-                } else if m.starts_with("MS Windows registry file, NT/2000 or above") {
+                } else if m.starts_with("MS Windows registry file") {
                     FileType::Reg
                 } else if m.starts_with("Zip archive data") {
                     FileType::Zip
@@ -593,17 +596,17 @@ impl YaraScanner {
             if m.contains("compressed data") || m.contains("archive data") {
                 log::warn!("'{}' contains compressed data, but it will not be decompressed before the scan. Consider using the '-C' flag", file.display());
                 FileType::Uncompressed
-            } else if m.starts_with("MS Windows Vista Event Log,") {
+            } else if   m.starts_with("MS Windows Vista Event Log,") ||
+                        m.starts_with("MS Windows 10-11 Event Log") {
                 FileType::Evtx
-            } else if m.starts_with("MS Windows registry file, NT/2000 or above") {
+            } else if m.starts_with("MS Windows registry file") {
                 FileType::Reg
             } else {
                 FileType::Uncompressed
             }
         } else {
             FileType::Uncompressed
-        };
-        file_type
+        }
     }
 
     fn scan_file(

@@ -15,7 +15,7 @@ pub enum OutputFormat {
 impl OutputFormat {
     pub(crate) fn to_options<W: Write>(&self, destination: W) -> OutputMethods<W> {
         let destination = match self {
-            OutputFormat::Csv => OutputDestination::Csv(csv::Writer::from_writer(destination)),
+            OutputFormat::Csv => OutputDestination::Csv(Box::new(csv::Writer::from_writer(destination))),
             OutputFormat::Txt => OutputDestination::Txt(destination),
             OutputFormat::Json => OutputDestination::Json(destination),
         };

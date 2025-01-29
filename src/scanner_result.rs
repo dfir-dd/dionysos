@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::path::Path;
 use serde_json::Value;
 
 use crate::csv_line::CsvLine;
@@ -14,22 +13,17 @@ pub trait ScannerFinding: Send + Sync + Display {
 }
 
 pub struct ScannerResult {
-    filename: String,
     findings: Vec<Box<dyn ScannerFinding>>
 }
 
 impl ScannerResult {
-    pub fn filename(&self) -> &str {
-        &self.filename[..]
+    pub fn new() -> Self {
+        Self {
+            findings: Vec::new(),
+        }
     }
-
     pub fn add_finding(&mut self, finding: Box<dyn ScannerFinding>) {
         self.findings.push(finding);
-    }
-
-
-    pub fn add_findings(&mut self, findings: impl Iterator<Item=Box<dyn ScannerFinding>>) {
-        self.findings.extend(findings);
     }
 
     pub fn has_findings(&self) -> bool {
@@ -38,24 +32,6 @@ impl ScannerResult {
 
     pub fn findings(&self) -> std::slice::Iter<'_, std::boxed::Box<dyn ScannerFinding>> {
         self.findings.iter()
-    }
-}
-
-impl From<&Path> for ScannerResult {
-    fn from(path: &Path) -> Self {
-        Self {
-            filename: path.to_string_lossy().to_string(),
-            findings: Vec::new()
-        }
-    }
-}
-
-impl From<String> for ScannerResult {
-    fn from(filename: String) -> Self {
-        Self {
-            filename,
-            findings: Vec::new()
-        }
     }
 }
 

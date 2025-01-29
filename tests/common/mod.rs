@@ -20,6 +20,7 @@ pub fn data_path() -> PathBuf {
         .unwrap()
 }
 
+#[allow(dead_code)]
 pub fn filenames_from_csv<T: std::convert::AsRef<[u8]>>(result: T) -> HashSet<String> {
     let mut reader = csv::Reader::from_reader(Cursor::new(result));
     let mut files = HashSet::new();
@@ -43,6 +44,7 @@ pub fn filenames_from_json<T: std::convert::AsRef<[u8]>>(result: T) -> HashSet<S
     files
 }
 
+#[allow(dead_code)]
 pub fn run_dionysos(cli: Cli) -> String {
     let results_dir = tempdir().unwrap();
     let results_filename = PathBuf::from(results_dir.path().display().to_string()).join("results");
@@ -60,6 +62,7 @@ pub fn run_dionysos(cli: Cli) -> String {
     buf
 }
 
+#[allow(dead_code)]
 pub fn filenames_from(format: &OutputFormat) -> fn(String) -> HashSet<String> {
     match format {
         OutputFormat::Csv => filenames_from_csv,

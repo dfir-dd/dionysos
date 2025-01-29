@@ -59,7 +59,7 @@ fn handle_file(
     scanners: &Arc<Vec<Box<dyn FileScanner>>>,
     entry: &walkdir::DirEntry,
 ) -> ScannerResult {
-    let mut result = ScannerResult::from(entry.path());
+    let mut result = ScannerResult::new();
     for scanner in scanners.iter() {
         log::trace!(
             "starting {} on {}",
