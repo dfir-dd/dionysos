@@ -101,7 +101,7 @@ impl HashScanner {
             let mut hasher = Md5::new();
             hasher.update(&slice);
             let result = hasher.finalize();
-            let crypto_hash = CryptoHash::MD5(result.try_into().unwrap());
+            let crypto_hash = CryptoHash::MD5(result.into());
             hashes.push(crypto_hash);
         }
 
@@ -109,7 +109,7 @@ impl HashScanner {
             let mut hasher = Sha1::new();
             hasher.update(&slice);
             let result = hasher.finalize();
-            let crypto_hash = CryptoHash::SHA1(result.try_into().unwrap());
+            let crypto_hash = CryptoHash::SHA1(result.into());
             hashes.push(crypto_hash);
         }
 
@@ -117,7 +117,7 @@ impl HashScanner {
             let mut hasher = Sha256::new();
             hasher.update(&slice);
             let result = hasher.finalize();
-            let crypto_hash = CryptoHash::SHA256(result.try_into().unwrap());
+            let crypto_hash = CryptoHash::SHA256(result.into());
             hashes.push(crypto_hash);
         }
 
@@ -148,7 +148,7 @@ impl FileScanner for HashScanner {
             Err(why) => vec![Err(anyhow!("unable to obtain metadata for file '{}'", why))],
             Ok(metadata) => {
                 if metadata.len() == 0 {
-                    self.scan_slice(&EMPTY_SLICE, entry)
+                    self.scan_slice(EMPTY_SLICE, entry)
                 } else {
                     let file = File::open(entry.path()).unwrap();
                     let mmap = unsafe { MmapOptions::new().map(&file).unwrap() };

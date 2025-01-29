@@ -6,7 +6,3 @@ pub trait FileScanner: Display + Sync + Send
 {
     fn scan_file(&self, file: &DirEntry) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>>;
 }
-
-pub trait CloneScanner {
-    fn clone_scanner(&self) -> Self;
-}

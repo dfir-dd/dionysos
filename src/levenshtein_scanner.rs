@@ -2,14 +2,14 @@ use maplit::hashset;
 use serde_json::json;
 use walkdir::DirEntry;
 
-use crate::filescanner::*;
 use crate::csv_line::CsvLine;
+use crate::filescanner::*;
 use crate::scanner_result::ScannerFinding;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::path::Path;
 pub struct LevenshteinScanner {
-    wellknown_files: Vec<Vec<char>>
+    wellknown_files: Vec<Vec<char>>,
 }
 
 impl Default for LevenshteinScanner {
@@ -22,12 +22,13 @@ impl Default for LevenshteinScanner {
             "chrome.exe",
             "csrss.exe",
             "firefox.exe",
-            "winlogon.exe"
+            "winlogon.exe",
         ];
-        let wellknown_files = WELLKNOWN_FILES.iter().map(|s| s.chars().collect()).collect();
-        Self {
-            wellknown_files
-        }
+        let wellknown_files = WELLKNOWN_FILES
+            .iter()
+            .map(|s| s.chars().collect())
+            .collect();
+        Self { wellknown_files }
     }
 }
 
@@ -44,27 +45,32 @@ impl Display for LevenshteinScanner {
 }
 
 impl LevenshteinScanner {
-    fn intern_scan_file(&self, file: &Path) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {        
+    fn intern_scan_file(&self, file: &Path) -> Vec<anyhow::Result<Box<dyn ScannerFinding>>> {
         match file.file_name() {
             None => vec![],
             Some(file_name) => match file_name.to_str() {
                 Some(os_fn) => {
-                    let res:  Vec<anyhow::Result<Box<dyn ScannerFinding>>> = self.wellknown_files
+                    let res: Vec<anyhow::Result<Box<dyn ScannerFinding>>> = self
+                        .wellknown_files
                         .iter()
                         .filter(|l| has_levenshtein_distance_one(&os_fn.chars().collect(), l))
-                        .map(|l| Ok(Box::new(LevenshteinScannerFinding{file_name: l.iter().collect(),  found_in_file: file.display().to_string()}) as Box<dyn ScannerFinding>))
+                        .map(|l| {
+                            Ok(Box::new(LevenshteinScannerFinding {
+                                file_name: l.iter().collect(),
+                                found_in_file: file.display().to_string(),
+                            }) as Box<dyn ScannerFinding>)
+                        })
                         .collect();
                     if file_name == "expl0rer.exe" {
                         assert_eq!(res.len(), 1);
                     }
                     res
                 }
-                None => vec![]
-            }
+                None => vec![],
+            },
         }
     }
 }
-
 
 struct LevenshteinScannerFinding {
     file_name: String,
@@ -75,14 +81,22 @@ impl Display for LevenshteinScannerFinding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let found_in_file = self.found_in_file();
         let filename = &self.file_name;
-        writeln!(f, "the name of the file {found_in_file} is very similar to {filename}")
+        writeln!(
+            f,
+            "the name of the file {found_in_file} is very similar to {filename}"
+        )
     }
 }
 
 impl ScannerFinding for LevenshteinScannerFinding {
     fn format_csv(&self) -> HashSet<CsvLine> {
         let file = self.found_in_file();
-        hashset![CsvLine::new("Levenshtein", &self.file_name, file, String::new())]
+        hashset![CsvLine::new(
+            "Levenshtein",
+            &self.file_name,
+            file,
+            String::new()
+        )]
     }
 
     fn to_json(&self) -> serde_json::Value {
@@ -102,7 +116,7 @@ impl ScannerFinding for LevenshteinScannerFinding {
 /**
  * This function was inspirered by:
  * https://github.com/wooorm/levenshtein-rs
- * 
+ *
  * `levenshtein-rs` - levenshtein
  *
  * MIT licensed.
@@ -180,11 +194,10 @@ pub fn has_levenshtein_distance_one(a: &Vec<char>, b: &Vec<char>) -> bool {
     result == dist
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::LevenshteinScanner;
+    use std::path::PathBuf;
 
     #[test]
     fn test_equal() {
@@ -197,11 +210,7 @@ mod tests {
 
     #[test]
     fn test_distance_one() {
-        let samples = vec![
-            "expl0rer.exe",
-            "explor3r.exe",
-            "3xplorer.exe"
-        ];
+        let samples = vec!["expl0rer.exe", "explor3r.exe", "3xplorer.exe"];
         let scanner = LevenshteinScanner::default();
         for sample_fn in samples {
             let filename = env!("CARGO_MANIFEST_DIR").to_owned() + sample_fn;
@@ -209,22 +218,18 @@ mod tests {
             let results = scanner.intern_scan_file(&sample);
             match results.last() {
                 None => assert!(results.is_empty(), "invalid result for {}", filename),
-                Some(result) => match result {
-                    Err(why) => panic!("error in scan_result: {:?}", why),
-                    Ok(_) => ()
+                Some(result) => {
+                    if let Err(why) = result {
+                        panic!("error in scan_result: {:?}", why)
+                    }
                 }
             }
         }
     }
 
-
     #[test]
     fn test_distance_more_than_one() {
-        let samples = vec![
-            "3xpl0rer.exe",
-            "expl0r3r.exe",
-            "3xpl0rer.exe"
-        ];
+        let samples = vec!["3xpl0rer.exe", "expl0r3r.exe", "3xpl0rer.exe"];
         let scanner = LevenshteinScanner::default();
         for sample_fn in samples {
             let filename = env!("CARGO_MANIFEST_DIR").to_owned() + sample_fn;

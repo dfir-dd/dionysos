@@ -11,9 +11,9 @@ use super::yara_string::YaraString;
 
 pub struct YaraFinding {
     pub identifier: String,
-    pub namespace: String,
+    //pub namespace: String,
     //pub metadatas: Vec<Metadata<'r>>,
-    pub tags: Vec<String>,
+    //pub tags: Vec<String>,
     pub strings: Vec<YaraString>,
     pub value_data: Option<String>,
     pub contained_file: Option<String>,
@@ -24,8 +24,8 @@ impl YaraFinding {
     pub fn new(rule: yara::Rule, found_in_file: String) -> Self {
         Self {
             identifier: rule.identifier.to_owned(),
-            namespace: rule.namespace.to_owned(),
-            tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
+            //namespace: rule.namespace.to_owned(),
+            //tags: rule.tags.iter().map(|s|String::from(*s)).collect(),
             strings: rule.strings.into_iter().map(|s| s.into()).collect(),
             value_data: None,
             contained_file: None,

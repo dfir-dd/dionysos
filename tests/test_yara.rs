@@ -84,7 +84,7 @@ fn test_yara_with_evtx() {
         .with_yara_evtx(true));
     let data_path = data_path();
 
-    let expected_files = vec!["Security.evtx"];
+    let expected_files = ["Security.evtx"];
     
     let detected_files = extract_filenames(result);
     for file in expected_files.iter() {
@@ -102,7 +102,7 @@ fn test_yara_with_reg() {
         .with_yara_evtx(true));
     let data_path = data_path();
 
-    let expected_files = vec!["NTUSER.DAT"];
+    let expected_files = ["NTUSER.DAT"];
     
     let detected_files = extract_filenames(result);
     for file in expected_files.iter() {
